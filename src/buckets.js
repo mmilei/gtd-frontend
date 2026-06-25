@@ -43,9 +43,10 @@ function renderTagBar() {
   const el    = document.getElementById('tag-bar')
   const items = bucketData[currentBucket] || []
 
+  const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
   const tally = {}
   for (const item of items) {
-    const tags = Array.isArray(item.tags) ? item.tags.filter(t => t !== 'gtd') : []
+    const tags = Array.isArray(item.tags) ? item.tags.filter(t => !SYSTEM_TAGS.has(t)) : []
     for (const t of tags) tally[t] = (tally[t] || 0) + 1
   }
 
@@ -143,7 +144,8 @@ function itemCard(item, meta) {
   const color    = meta.color || 'var(--muted)'
   const due      = item.due ? `· ${item.due}` : ''
   const delegado = item.delegado_a ? `· @${item.delegado_a}` : ''
-  const tags     = Array.isArray(item.tags) ? item.tags.filter(t => t !== 'gtd') : []
+  const SYSTEM   = new Set(['gtd', 'action', 'reference', 'project'])
+  const tags     = Array.isArray(item.tags) ? item.tags.filter(t => !SYSTEM.has(t)) : []
   const snippet  = bodySnippet(item.body)
 
   return `

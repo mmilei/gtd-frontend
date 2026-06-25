@@ -2,6 +2,7 @@ import { initScene } from './scene.js'
 import { chat, ping } from './api.js'
 import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
 import { initModal } from './modal.js'
+import { initRefsPanel, refreshIfOpen } from './refs.js'
 
 // ─── Init Three.js background ──────────────────────────────
 const canvas = document.getElementById('bg-canvas')
@@ -10,6 +11,7 @@ const { pulse } = initScene(canvas)
 // ─── Init sidebar ───────────────────────────────────────────
 initSidebar()
 initModal(refreshBuckets)
+initRefsPanel()
 
 // ─── API health check ───────────────────────────────────────
 const statusDot   = document.getElementById('api-status')
@@ -80,6 +82,7 @@ async function sendMessage() {
     appendApiResponse(ops, fallback)
     pulse() // Three.js particle burst
     await refreshBuckets()
+    await refreshIfOpen()
 
     // Update status
     statusDot.className = 'status-dot online'

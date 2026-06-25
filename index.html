@@ -23,11 +23,27 @@
         <span class="logo-dot"></span>
         <span class="logo-text">GTD Brain</span>
       </div>
-      <div class="header-status">
-        <span id="api-status" class="status-dot offline" title="API status"></span>
-        <span id="api-label" class="status-label">conectando…</span>
+      <div class="header-right">
+        <button id="refs-btn" class="refs-toggle-btn" title="Referencias (R)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Ref
+        </button>
+        <div class="header-status">
+          <span id="api-status" class="status-dot offline" title="API status"></span>
+          <span id="api-label" class="status-label">conectando…</span>
+        </div>
       </div>
     </header>
+
+    <!-- References panel (slide-in from right) -->
+    <div id="refs-panel" class="refs-panel">
+      <div class="refs-header">
+        <span class="refs-title">Referencias</span>
+        <input id="refs-search" class="refs-search" placeholder="Buscar…" autocomplete="off" spellcheck="false" />
+        <button id="refs-close" class="refs-close-btn" title="Cerrar">✕</button>
+      </div>
+      <div id="refs-body" class="refs-body"></div>
+    </div>
 
     <!-- Main layout -->
     <main id="main">
