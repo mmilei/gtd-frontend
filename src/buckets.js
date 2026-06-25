@@ -96,18 +96,20 @@ function renderItems() {
 }
 
 function itemCard(item, meta) {
-  const color = meta.color || 'var(--muted)'
-  const due   = item.due ? `· ${item.due}` : ''
-  const delegado = item.delegado_a ? `· ${item.delegado_a}` : ''
+  const color    = meta.color || 'var(--muted)'
+  const due      = item.due ? `· ${item.due}` : ''
+  const delegado = item.delegado_a ? `· @${item.delegado_a}` : ''
+  const tags     = Array.isArray(item.tags) ? item.tags.filter(t => t !== 'gtd') : []
 
   return `
     <div class="item-card bc-${item.bucket || currentBucket}" style="--bucket-color:${color}">
       <div class="item-title">${escHtml(item.title || item.file || '—')}</div>
       <div class="item-meta">
         <span>${escHtml(item.created || '')}</span>
-        ${due       ? `<span>${escHtml(due)}</span>`       : ''}
-        ${delegado  ? `<span>${escHtml(delegado)}</span>`  : ''}
+        ${due      ? `<span>${escHtml(due)}</span>`      : ''}
+        ${delegado ? `<span>${escHtml(delegado)}</span>` : ''}
       </div>
+      ${tags.length ? `<div class="item-tags">${tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
       <button class="done-btn" data-file="${escAttr(item.file)}" title="Marcar como hecho">
         ${circleSVG()}
       </button>

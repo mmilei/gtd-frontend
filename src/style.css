@@ -237,6 +237,21 @@ html, body {
   gap: 8px;
 }
 
+.item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(99,102,241,0.15);
+  color: var(--reference);
+  border: 1px solid rgba(99,102,241,0.25);
+}
+
 .done-btn {
   position: absolute;
   right: 8px;

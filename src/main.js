@@ -73,9 +73,9 @@ async function sendMessage() {
   scrollToBottom()
 
   try {
-    const ops = await chat(text)
+    const { fallback, ops } = await chat(text)
     typingEl.remove()
-    appendApiResponse(ops)
+    appendApiResponse(ops, fallback)
     pulse() // Three.js particle burst
     await refreshBuckets()
 
@@ -110,12 +110,12 @@ function appendTyping() {
   return el
 }
 
-function appendApiResponse(ops) {
+function appendApiResponse(ops, fallback) {
   const wrap = document.createElement('div')
   wrap.className = 'msg-api'
-  wrap.innerHTML = `<div class="api-label">GTD Brain</div>`
+  wrap.innerHTML = `<div class="api-label">GTD Brain${fallback ? ' <span style="font-size:10px;opacity:0.5">(fallback)</span>' : ''}</div>`
 
-  for (const op of ops) {
+  for (const op of (ops || [])) {
     wrap.appendChild(buildOpCard(op))
   }
   messagesEl.appendChild(wrap)
