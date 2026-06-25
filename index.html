@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTD Brain</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body class="overflow-hidden">
+
+  <!-- Three.js canvas (background) -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- App shell -->
+  <div id="app">
+
+    <!-- Header -->
+    <header id="header">
+      <div class="header-logo">
+        <span class="logo-dot"></span>
+        <span class="logo-text">GTD Brain</span>
+      </div>
+      <div class="header-status">
+        <span id="api-status" class="status-dot offline" title="API status"></span>
+        <span id="api-label" class="status-label">conectando…</span>
+      </div>
+    </header>
+
+    <!-- Main layout -->
+    <main id="main">
+
+      <!-- Sidebar -->
+      <aside id="sidebar">
+        <div class="sidebar-header">
+          <div class="bucket-tabs">
+            <button class="tab-btn active" data-bucket="today">Hoy</button>
+            <button class="tab-btn" data-bucket="backlog">Backlog</button>
+            <button class="tab-btn" data-bucket="waiting">Waiting</button>
+            <button class="tab-btn" data-bucket="someday">Someday</button>
+          </div>
+        </div>
+
+        <div id="bucket-counts" class="bucket-counts"></div>
+
+        <div id="items-list" class="items-list">
+          <div class="empty-state">
+            <p>Sin ítems</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Chat panel -->
+      <section id="chat-panel">
+        <div id="messages" class="messages"></div>
+
+        <div id="chat-input-area">
+          <div class="input-wrapper">
+            <textarea
+              id="chat-input"
+              placeholder="Escribí algo para capturar… (Enter para enviar)"
+              rows="1"
+              autocomplete="off"
+              spellcheck="false"
+            ></textarea>
+            <button id="send-btn" aria-label="Enviar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+          <p class="input-hint">Enter → enviar &nbsp;·&nbsp; Shift+Enter → nueva línea</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
