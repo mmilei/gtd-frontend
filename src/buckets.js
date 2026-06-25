@@ -1,4 +1,5 @@
 import { getBuckets, getToday, markDone } from './api.js'
+import { openModal } from './modal.js'
 
 const BUCKET_META = {
   today:     { label: 'Hoy',     color: 'var(--today)',     icon: '⚡' },
@@ -69,16 +70,16 @@ function renderItems() {
   el.innerHTML = items.map(item => itemCard(item, meta)).join('')
 
   el.querySelectorAll('.done-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation()
       const filename = btn.dataset.file
       btn.classList.add('completing')
       btn.innerHTML = checkSVG()
       try {
         await markDone(filename)
+        playBoink()
         const card = btn.closest('.item-card')
-        card.style.transition = 'opacity 0.3s, transform 0.3s'
-        card.style.opacity = '0'
-        card.style.transform = 'translateX(20px)'
+        card.classList.add('boinking')
         setTimeout(() => {
           bucketData[currentBucket] = (bucketData[currentBucket] || []).filter(i => i.file !== filename)
           if (currentBucket === 'today') {
@@ -86,11 +87,18 @@ function renderItems() {
           }
           renderCounts()
           renderItems()
-        }, 300)
+        }, 280)
       } catch {
         btn.classList.remove('completing')
         btn.innerHTML = circleSVG()
       }
+    })
+  })
+
+  el.querySelectorAll('.item-card[data-file]').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.done-btn')) return
+      openModal(card.dataset.file)
     })
   })
 }
@@ -100,21 +108,49 @@ function itemCard(item, meta) {
   const due      = item.due ? `· ${item.due}` : ''
   const delegado = item.delegado_a ? `· @${item.delegado_a}` : ''
   const tags     = Array.isArray(item.tags) ? item.tags.filter(t => t !== 'gtd') : []
+  const snippet  = bodySnippet(item.body)
 
   return `
-    <div class="item-card bc-${item.bucket || currentBucket}" style="--bucket-color:${color}">
+    <div class="item-card bc-${item.bucket || currentBucket}" style="--bucket-color:${color}" data-file="${escAttr(item.file)}">
       <div class="item-title">${escHtml(item.title || item.file || '—')}</div>
       <div class="item-meta">
         <span>${escHtml(item.created || '')}</span>
         ${due      ? `<span>${escHtml(due)}</span>`      : ''}
         ${delegado ? `<span>${escHtml(delegado)}</span>` : ''}
       </div>
+      ${snippet ? `<div class="item-preview">${escHtml(snippet)}</div>` : ''}
       ${tags.length ? `<div class="item-tags">${tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
       <button class="done-btn" data-file="${escAttr(item.file)}" title="Marcar como hecho">
         ${circleSVG()}
       </button>
     </div>
   `
+}
+
+function bodySnippet(body) {
+  if (!body) return ''
+  const line = body.split('\n').find(l => l.trim() && !/^#+\s/.test(l) && !/^[-*]\s/.test(l))
+  if (!line) return ''
+  const t = line.trim()
+  return t.slice(0, 80) + (t.length > 80 ? '…' : '')
+}
+
+function playBoink() {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)()
+    const osc  = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.12)
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.2)
+  } catch { /* silencio si el browser bloquea AudioContext */ }
 }
 
 function circleSVG() {

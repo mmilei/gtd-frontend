@@ -1,6 +1,7 @@
 import { initScene } from './scene.js'
 import { chat, ping } from './api.js'
 import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
+import { initModal } from './modal.js'
 
 // ─── Init Three.js background ──────────────────────────────
 const canvas = document.getElementById('bg-canvas')
@@ -8,6 +9,7 @@ const { pulse } = initScene(canvas)
 
 // ─── Init sidebar ───────────────────────────────────────────
 initSidebar()
+initModal(refreshBuckets)
 
 // ─── API health check ───────────────────────────────────────
 const statusDot   = document.getElementById('api-status')
