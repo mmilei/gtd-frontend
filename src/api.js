@@ -30,6 +30,22 @@ export async function markDone(filename) {
   return res.json()
 }
 
+export async function fetchItem(filename) {
+  const res = await fetch(`${BASE}/items/${encodeURIComponent(filename)}`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function replaceBody(filename, body) {
+  const res = await fetch(`${BASE}/items/${encodeURIComponent(filename)}/body`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
 export async function ping() {
   try {
     const res = await fetch(`${BASE}/buckets`, { signal: AbortSignal.timeout(3000) })
