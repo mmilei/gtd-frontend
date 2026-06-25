@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-const PARTICLE_COUNT = 120
+const PARTICLE_COUNT = 560
 const CONNECTION_DISTANCE = 120
 const COLORS = [0x6366f1, 0x8b5cf6, 0x06b6d4, 0x10b981]
 
@@ -27,9 +27,9 @@ export function initScene(canvas) {
     positions[i * 3 + 2] = z
 
     velocities.push({
-      x: (Math.random() - 0.5) * 0.3,
-      y: (Math.random() - 0.5) * 0.3,
-      z: (Math.random() - 0.5) * 0.1,
+      x: (Math.random() - 0.5) * 0.0000008,
+      y: (Math.random() - 0.5) * 0.0000008,
+      z: (Math.random() - 0.5) * 0.0000003,
     })
 
     const c = new THREE.Color(COLORS[Math.floor(Math.random() * COLORS.length)])
@@ -43,7 +43,7 @@ export function initScene(canvas) {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 
   const mat = new THREE.PointsMaterial({
-    size: 3,
+    size: 6,
     vertexColors: true,
     transparent: true,
     opacity: 0.7,
@@ -63,7 +63,7 @@ export function initScene(canvas) {
   const lines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({
     vertexColors: true,
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.45,
   }))
   scene.add(lines)
 
@@ -106,7 +106,7 @@ export function initScene(canvas) {
     geo.attributes.position.needsUpdate = true
 
     // Update connections (every 2 frames for perf)
-    if (frame % 2 === 0) {
+    if (frame % 3 === 0) {
       let lineIdx = 0
       const lp = lineGeo.attributes.position.array
       const lc = lineGeo.attributes.color.array
@@ -148,20 +148,20 @@ export function initScene(canvas) {
     // Pulse effect
     if (pulseStrength > 0) {
       mat.opacity = 0.7 + pulseStrength * 0.4
-      mat.size    = 3 + pulseStrength * 4
-      lines.material.opacity = 0.18 + pulseStrength * 0.25
+      mat.size    = 6 + pulseStrength * 4
+      lines.material.opacity = 0.45 + pulseStrength * 0.25
       pulseStrength *= 0.88
       if (pulseStrength < 0.01) {
         pulseStrength = 0
         mat.opacity   = 0.7
-        mat.size      = 3
-        lines.material.opacity = 0.18
+        mat.size      = 6
+        lines.material.opacity = 0.45
       }
     }
 
-    // Slow camera drift
-    camera.position.x = Math.sin(frame * 0.0004) * 30
-    camera.position.y = Math.cos(frame * 0.0003) * 20
+    // Very slow camera drift
+    camera.position.x = Math.sin(frame * 0.0001) * 3
+    camera.position.y = Math.cos(frame * 0.00008) * 2
     camera.lookAt(scene.position)
 
     renderer.render(scene, camera)
