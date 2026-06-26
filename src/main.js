@@ -65,6 +65,12 @@ sendBtn.addEventListener('click', sendMessage)
 
 // ─── Send message ───────────────────────────────────────────
 async function sendMessage() {
+  if (micState === 'recording') {
+    pendingSend = true
+    if (recognition) { recognition.stop(); recognition = null }
+    mediaRecorder.stop()
+    return
+  }
   const text = inputEl.value.trim()
   if (!text) return
 
@@ -206,11 +212,18 @@ const micBtn = document.getElementById('mic-btn')
 let mediaRecorder = null
 let audioChunks = []
 let micState = 'idle' // idle | recording | transcribing
+let recognition = null
+let pendingSend = false
 
 function setMicState(state) {
   micState = state
   micBtn.dataset.state = state
   micBtn.disabled = state === 'transcribing'
+}
+
+function resizeInput() {
+  inputEl.style.height = 'auto'
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px'
 }
 
 micBtn.addEventListener('click', async () => {
@@ -228,8 +241,7 @@ micBtn.addEventListener('click', async () => {
           const { text } = await transcribe(blob)
           if (text?.trim()) {
             inputEl.value = text.trim()
-            inputEl.style.height = 'auto'
-            inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px'
+            resizeInput()
             inputEl.focus()
             pulse()
           }
@@ -237,14 +249,37 @@ micBtn.addEventListener('click', async () => {
           appendError('Transcripción fallida: ' + err.message)
         } finally {
           setMicState('idle')
+          if (pendingSend) { pendingSend = false; sendMessage() }
         }
       }
       mediaRecorder.start()
+
+      // Real-time preview via Web Speech API; Whisper corrects on stop
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition()
+        recognition.continuous = true
+        recognition.interimResults = true
+        recognition.lang = 'es-AR'
+        let finalText = ''
+        recognition.onresult = e => {
+          let interim = ''
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) finalText += e.results[i][0].transcript
+            else interim += e.results[i][0].transcript
+          }
+          inputEl.value = finalText + interim
+          resizeInput()
+        }
+        recognition.start()
+      }
+
       setMicState('recording')
     } catch {
       appendError('No se pudo acceder al micrófono.')
     }
   } else if (micState === 'recording') {
+    if (recognition) { recognition.stop(); recognition = null }
     mediaRecorder.stop()
   }
 })
