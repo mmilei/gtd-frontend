@@ -1,7 +1,8 @@
 import { initScene } from './scene.js'
-import { chat, ping } from './api.js'
+import { chat, ping, transcribe } from './api.js'
 import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
 import { initModal } from './modal.js'
+import { initRefsPanel, refreshIfOpen } from './refs.js'
 
 // ─── Init Three.js background ──────────────────────────────
 const canvas = document.getElementById('bg-canvas')
@@ -10,6 +11,7 @@ const { pulse } = initScene(canvas)
 // ─── Init sidebar ───────────────────────────────────────────
 initSidebar()
 initModal(refreshBuckets)
+initRefsPanel()
 
 // ─── API health check ───────────────────────────────────────
 const statusDot   = document.getElementById('api-status')
@@ -80,6 +82,7 @@ async function sendMessage() {
     appendApiResponse(ops, fallback)
     pulse() // Three.js particle burst
     await refreshBuckets()
+    await refreshIfOpen()
 
     // Update status
     statusDot.className = 'status-dot online'
@@ -197,6 +200,54 @@ function escHtml(s) {
 function scrollToBottom() {
   messagesEl.scrollTop = messagesEl.scrollHeight
 }
+
+// ─── Voice input ────────────────────────────────────────────
+const micBtn = document.getElementById('mic-btn')
+let mediaRecorder = null
+let audioChunks = []
+let micState = 'idle' // idle | recording | transcribing
+
+function setMicState(state) {
+  micState = state
+  micBtn.dataset.state = state
+  micBtn.disabled = state === 'transcribing'
+}
+
+micBtn.addEventListener('click', async () => {
+  if (micState === 'idle') {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioChunks = []
+      mediaRecorder = new MediaRecorder(stream)
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data) }
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setMicState('transcribing')
+        try {
+          const blob = new Blob(audioChunks, { type: 'audio/webm' })
+          const { text } = await transcribe(blob)
+          if (text?.trim()) {
+            inputEl.value = text.trim()
+            inputEl.style.height = 'auto'
+            inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px'
+            inputEl.focus()
+            pulse()
+          }
+        } catch (err) {
+          appendError('Transcripción fallida: ' + err.message)
+        } finally {
+          setMicState('idle')
+        }
+      }
+      mediaRecorder.start()
+      setMicState('recording')
+    } catch {
+      appendError('No se pudo acceder al micrófono.')
+    }
+  } else if (micState === 'recording') {
+    mediaRecorder.stop()
+  }
+})
 
 // Focus input on load
 inputEl.focus()

@@ -46,6 +46,14 @@ export async function replaceBody(filename, body) {
   return res.json()
 }
 
+export async function transcribe(audioBlob) {
+  const form = new FormData()
+  form.append('audio', audioBlob, 'recording.webm')
+  const res = await fetch(`${BASE}/transcribe`, { method: 'POST', body: form })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() // { text }
+}
+
 export async function ping() {
   try {
     const res = await fetch(`${BASE}/buckets`, { signal: AbortSignal.timeout(3000) })

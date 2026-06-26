@@ -10,7 +10,8 @@ const BUCKET_META = {
 }
 
 let currentBucket = 'today'
-let bucketData = {}
+let bucketData    = {}
+let selectedTag   = null
 
 export function initSidebar() {
   const tabs = document.querySelectorAll('.tab-btn')
@@ -19,6 +20,8 @@ export function initSidebar() {
       tabs.forEach(t => t.classList.remove('active'))
       btn.classList.add('active')
       currentBucket = btn.dataset.bucket
+      selectedTag   = null
+      renderTagBar()
       renderItems()
     })
   })
@@ -29,10 +32,40 @@ export async function refreshBuckets() {
     const [all, today] = await Promise.all([getBuckets(), getToday()])
     bucketData = { ...all, today }
     renderCounts()
+    renderTagBar()
     renderItems()
   } catch {
     // silently ignore — API might not be running yet
   }
+}
+
+function renderTagBar() {
+  const el    = document.getElementById('tag-bar')
+  const items = bucketData[currentBucket] || []
+
+  const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
+  const tally = {}
+  for (const item of items) {
+    const tags = Array.isArray(item.tags) ? item.tags.filter(t => !SYSTEM_TAGS.has(t)) : []
+    for (const t of tags) tally[t] = (tally[t] || 0) + 1
+  }
+
+  const tags = Object.entries(tally).sort((a, b) => b[1] - a[1])
+  if (tags.length === 0) { el.innerHTML = ''; return }
+
+  el.innerHTML = tags.map(([tag, count]) => `
+    <button class="tag-filter-pill${selectedTag === tag ? ' active' : ''}" data-tag="${escAttr(tag)}">
+      ${escHtml(tag)} <span class="tpill-count">${count}</span>
+    </button>
+  `).join('')
+
+  el.querySelectorAll('.tag-filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      selectedTag = selectedTag === pill.dataset.tag ? null : pill.dataset.tag
+      renderTagBar()
+      renderItems()
+    })
+  })
 }
 
 function renderCounts() {
@@ -58,11 +91,15 @@ function renderCounts() {
 }
 
 function renderItems() {
-  const el = document.getElementById('items-list')
-  const items = bucketData[currentBucket] || []
+  const el  = document.getElementById('items-list')
+  const all = bucketData[currentBucket] || []
+
+  const items = selectedTag
+    ? all.filter(i => Array.isArray(i.tags) && i.tags.includes(selectedTag))
+    : all
 
   if (items.length === 0) {
-    el.innerHTML = '<div class="empty-state"><p>Sin ítems</p></div>'
+    el.innerHTML = `<div class="empty-state"><p>${selectedTag ? `Sin ítems con #${escHtml(selectedTag)}` : 'Sin ítems'}</p></div>`
     return
   }
 
@@ -107,7 +144,8 @@ function itemCard(item, meta) {
   const color    = meta.color || 'var(--muted)'
   const due      = item.due ? `· ${item.due}` : ''
   const delegado = item.delegado_a ? `· @${item.delegado_a}` : ''
-  const tags     = Array.isArray(item.tags) ? item.tags.filter(t => t !== 'gtd') : []
+  const SYSTEM   = new Set(['gtd', 'action', 'reference', 'project'])
+  const tags     = Array.isArray(item.tags) ? item.tags.filter(t => !SYSTEM.has(t)) : []
   const snippet  = bodySnippet(item.body)
 
   return `
