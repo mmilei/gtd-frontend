@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  # Manual trigger (fallback)
   workflow_dispatch:
     inputs:
       version:
@@ -8,26 +9,48 @@ on:
         required: true
         type: string
 
+  # Auto-trigger on PR merge when a release:X.X.X label is present
+  pull_request:
+    types: [closed]
+    branches: [master]
+
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       contains(toJson(github.event.pull_request.labels.*.name), 'release:'))
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            LABEL=$(echo '${{ toJson(github.event.pull_request.labels.*.name) }}' \
+              | jq -r '.[] | select(startswith("release:"))' | head -1)
+            echo "version=${LABEL#release:}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag v${{ inputs.version }}
-          git push origin v${{ inputs.version }}
+          git tag v${{ steps.ver.outputs.version }}
+          git push origin v${{ steps.ver.outputs.version }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
           generate_release_notes: true
