@@ -14,6 +14,11 @@ on:
     types: [closed]
     branches: [master]
 
+  # Auto-trigger when a vX.X.X tag is pushed directly
+  push:
+    tags:
+      - 'v*'
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -22,6 +27,7 @@ jobs:
 
     if: |
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       (github.event.pull_request.merged == true &&
        contains(toJson(github.event.pull_request.labels.*.name), 'release:'))
 
@@ -35,6 +41,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
           else
             LABEL=$(echo '${{ toJson(github.event.pull_request.labels.*.name) }}' \
               | jq -r '.[] | select(startswith("release:"))' | head -1)
@@ -42,6 +50,7 @@ jobs:
           fi
 
       - name: Create and push tag
+        if: github.event_name != 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
