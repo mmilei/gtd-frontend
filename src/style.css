@@ -843,12 +843,21 @@ html, body {
   color: var(--muted);
 }
 
-.modal-title {
+.modal-title-input {
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
   line-height: 1.4;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+  width: 100%;
+  padding: 2px 0 6px;
+  font-family: inherit;
+  transition: border-color 0.2s;
 }
+.modal-title-input:focus { border-bottom-color: rgba(99,102,241,0.5); }
 
 .modal-textarea {
   background: var(--surface);
@@ -914,4 +923,112 @@ html, body {
   background: rgba(255,255,255,0.15);
   padding: 1px 5px;
   border-radius: 4px;
+}
+
+/* ─── Modal metadata section ────────────────────────────── */
+.modal-meta-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.modal-field { display: flex; flex-direction: column; gap: 4px; }
+
+.modal-field-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.modal-tags-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 0;
+}
+
+.modal-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 2px 8px 2px 8px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.tag-remove-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  margin-left: 2px;
+  transition: color 0.15s;
+}
+.tag-remove-btn:hover { color: var(--text); }
+
+.modal-tag-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  width: 80px;
+}
+.modal-tag-input::placeholder { color: var(--muted); }
+
+.modal-dates-row {
+  display: flex;
+  gap: 16px;
+}
+.modal-dates-row .modal-field { flex: 1; }
+
+.modal-date-input {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.modal-date-input:focus { border-color: rgba(99,102,241,0.5); }
+.modal-date-input::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+
+/* ─── Age badges (today bucket) ─────────────────────────── */
+.age-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-left: 4px;
+}
+.age-warning {
+  background: rgba(245,158,11,0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,0.3);
+}
+.age-stale {
+  background: rgba(239,68,68,0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.3);
 }

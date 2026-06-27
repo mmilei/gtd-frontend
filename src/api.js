@@ -36,6 +36,16 @@ export async function fetchItem(filename) {
   return res.json()
 }
 
+export async function patchMeta(filename, meta) {
+  const res = await fetch(`${BASE}/items/${encodeURIComponent(filename)}/meta`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(meta),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
 export async function replaceBody(filename, body) {
   const res = await fetch(`${BASE}/items/${encodeURIComponent(filename)}/body`, {
     method: 'PUT',
