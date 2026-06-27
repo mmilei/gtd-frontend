@@ -147,6 +147,7 @@ function itemCard(item, meta) {
   const SYSTEM   = new Set(['gtd', 'action', 'reference', 'project'])
   const tags     = Array.isArray(item.tags) ? item.tags.filter(t => !SYSTEM.has(t)) : []
   const snippet  = bodySnippet(item.body)
+  const ageBadge = ageBadgeHtml(item)
 
   return `
     <div class="item-card bc-${item.bucket || currentBucket}" style="--bucket-color:${color}" data-file="${escAttr(item.file)}">
@@ -155,6 +156,7 @@ function itemCard(item, meta) {
         <span>${escHtml(item.created || '')}</span>
         ${due      ? `<span>${escHtml(due)}</span>`      : ''}
         ${delegado ? `<span>${escHtml(delegado)}</span>` : ''}
+        ${ageBadge}
       </div>
       ${snippet ? `<div class="item-preview">${escHtml(snippet)}</div>` : ''}
       ${tags.length ? `<div class="item-tags">${tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
@@ -163,6 +165,14 @@ function itemCard(item, meta) {
       </button>
     </div>
   `
+}
+
+function ageBadgeHtml(item) {
+  if (currentBucket !== 'today' || !item.today_since) return ''
+  const days = Math.floor((Date.now() - new Date(item.today_since)) / 86400000)
+  if (days < 2) return ''
+  const cls = days >= 3 ? 'age-stale' : 'age-warning'
+  return `<span class="age-badge ${cls}">${days}d</span>`
 }
 
 function bodySnippet(body) {
