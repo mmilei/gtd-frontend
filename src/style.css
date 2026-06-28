@@ -1159,3 +1159,16 @@ html, body {
 .review-action-btn:hover { background: var(--surface-hover); }
 .btn-done    { color: #10b981; border-color: rgba(16,185,129,0.35); }
 .btn-dismiss { color: #ef4444; border-color: rgba(239,68,68,0.35); }
+
+/* ─── Demo mode banner ───────────────────────────────────────── */
+.demo-banner {
+  font-size: 10px;
+  font-weight: 500;
+  color: #f59e0b;
+  background: rgba(245,158,11,0.10);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: 6px;
+  padding: 3px 10px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
