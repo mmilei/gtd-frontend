@@ -12,7 +12,7 @@ export default defineConfig(({ command, mode }) => {
     base: command === 'build' ? '/gtd-frontend/' : '/',
     resolve: {
       alias: isMock
-        ? [{ find: /\/api\.js$/, replacement: resolve(__dirname, 'src/api.mock.js') }]
+        ? [{ find: /^.*\/api\.js$/, replacement: resolve(__dirname, 'src/api.mock.js') }]
         : [],
     },
     server: {
