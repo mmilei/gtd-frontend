@@ -3,6 +3,7 @@ import { chat, ping, transcribe } from './api.js'
 import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
 import { initModal } from './modal.js'
 import { initRefsPanel, refreshIfOpen } from './refs.js'
+import { initReview, openReview } from './review.js'
 
 // ─── Init Three.js background ──────────────────────────────
 const canvas = document.getElementById('bg-canvas')
@@ -12,6 +13,9 @@ const { pulse } = initScene(canvas)
 initSidebar()
 initModal(refreshBuckets)
 initRefsPanel()
+initReview(refreshBuckets)
+
+document.getElementById('review-btn').addEventListener('click', openReview)
 
 // ─── API health check ───────────────────────────────────────
 const statusDot   = document.getElementById('api-status')

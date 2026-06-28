@@ -1,4 +1,4 @@
-import { fetchItem, replaceBody, patchMeta } from './api.js'
+import { fetchItem, replaceBody, patchMeta, markdownifyItem } from './api.js'
 
 const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
 
@@ -36,6 +36,7 @@ export function initModal(onSave) {
       </div>
       <div class="modal-actions">
         <button id="modal-cancel">Cancelar</button>
+        <button id="modal-markdownify" class="modal-markdownify-btn" title="Enriquecer con IA">✨ Mejorar</button>
         <button id="modal-save">Guardar <kbd>Ctrl+Enter</kbd></button>
       </div>
     </div>
@@ -47,6 +48,7 @@ export function initModal(onSave) {
   })
   document.getElementById('modal-cancel').addEventListener('click', closeModal)
   document.getElementById('modal-save').addEventListener('click', saveModal)
+  document.getElementById('modal-markdownify').addEventListener('click', runMarkdownify)
 
   document.addEventListener('keydown', e => {
     if (!isOpen()) return
@@ -89,6 +91,15 @@ export function openModal(filename) {
       if (item.bucket === 'today') {
         tsField.style.display = 'block'
         tsEl.value = item.today_since || ''
+      }
+
+      const mdBtn = document.getElementById('modal-markdownify')
+      if (item.bucket === 'reference') {
+        mdBtn.style.display = 'none'
+      } else {
+        mdBtn.style.display = ''
+        mdBtn.disabled = !!item.markdownified
+        mdBtn.title = item.markdownified ? 'Ya fue mejorada con IA' : 'Enriquecer con IA'
       }
 
       renderTagPills()
@@ -175,6 +186,29 @@ function removeTag(tag) {
   document.getElementById('modal-tag-input')?.focus()
 }
 
+async function runMarkdownify() {
+  if (!currentFile) return
+  const mdBtn  = document.getElementById('modal-markdownify')
+  const bodyEl = document.getElementById('modal-body')
+
+  mdBtn.disabled    = true
+  mdBtn.textContent = '✨ Mejorando…'
+
+  try {
+    const result = await markdownifyItem(currentFile)
+    bodyEl.value = result.body || bodyEl.value
+    if (Array.isArray(result.tags)) {
+      currentTags = result.tags
+      renderTagPills()
+    }
+    mdBtn.textContent = '✨ Mejorar'
+    mdBtn.title = 'Ya fue mejorada con IA'
+  } catch {
+    mdBtn.disabled    = false
+    mdBtn.textContent = '✨ Error — reintentar'
+  }
+}
+
 async function saveModal() {
   if (!currentFile) return
   const saveBtn = document.getElementById('modal-save')
@@ -192,9 +226,13 @@ async function saveModal() {
     const bodyChanged = newBody !== (orig.body || '')
     if (bodyChanged) await replaceBody(currentFile, newBody)
 
+    if (!currentTags.includes('gtd')) currentTags.unshift('gtd')
+
     const meta = {}
     if (newTitle && newTitle !== (orig.title || '')) meta.title = newTitle
-    if (JSON.stringify(currentTags.sort()) !== JSON.stringify([...(orig.tags || [])].sort())) meta.tags = currentTags
+    const sortedCurrent = [...currentTags].sort()
+    const sortedOrig = [...(orig.tags || [])].sort()
+    if (JSON.stringify(sortedCurrent) !== JSON.stringify(sortedOrig)) meta.tags = currentTags
     if (newDue !== (orig.due || null)) meta.due = newDue
     if (newTs  !== (orig.today_since || null)) meta.today_since = newTs
 
