@@ -69,12 +69,13 @@ export function openModal(filename) {
   const tsField    = document.getElementById('modal-today-since-field')
   const tsEl       = document.getElementById('modal-today-since')
 
-  titleEl.value = '…'
-  bodyEl.value  = ''
-  dueEl.value   = ''
-  tsEl.value    = ''
+  titleEl.value    = '…'
+  bodyEl.value     = ''
+  dueEl.value      = ''
+  tsEl.value       = ''
   tsField.style.display = 'none'
-  saveBtn.disabled = true
+  saveBtn.innerHTML = 'Guardar <kbd>Ctrl+Enter</kbd>'
+  saveBtn.disabled  = true
   renderTagPills()
 
   document.getElementById('edit-modal').classList.remove('hidden')
