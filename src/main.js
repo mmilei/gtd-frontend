@@ -38,6 +38,13 @@ async function checkApi() {
 checkApi()
 setInterval(checkApi, 30_000)
 
+if (import.meta.env.VITE_MOCK === 'true') {
+  const banner = document.createElement('div')
+  banner.className = 'demo-banner'
+  banner.textContent = 'Modo demo — los datos son ficticios y se reinician al recargar'
+  document.getElementById('header').appendChild(banner)
+}
+
 // ─── Chat state ─────────────────────────────────────────────
 const messagesEl = document.getElementById('messages')
 const inputEl    = document.getElementById('chat-input')
