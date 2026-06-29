@@ -53,6 +53,7 @@ export function initToast() {
         }
         hideToast()
         await refreshBuckets()
+        drainQueue()
       } catch (err) {
         console.error('Toast action failed:', err)
         btn.disabled = false
@@ -87,7 +88,7 @@ function displayToast(op, onDone) {
   bar.style.background = meta.color
   bar.style.animation = 'none'
   bar.offsetHeight // force reflow to restart animation
-  bar.style.animation = 'toast-shrink 3s linear forwards'
+  bar.style.animation = 'toast-shrink 10s linear forwards'
 
   toastEl.classList.remove('hidden')
 
@@ -95,7 +96,7 @@ function displayToast(op, onDone) {
   dismissTimer = setTimeout(() => {
     hideToast()
     onDone()
-  }, 3200)
+  }, 10200)
 }
 
 function hideToast() {
