@@ -47,13 +47,13 @@ function closePanel() {
 
 async function loadAndRender() {
   const body = document.getElementById('refs-body')
-  body.innerHTML = '<div class="refs-empty">Cargando…</div>'
+  body.innerHTML = '<div class="refs-empty">Loading…</div>'
   try {
     const data = await getBuckets()
     allItems = data.reference || []
     renderRefs(document.getElementById('refs-search').value.trim())
   } catch {
-    body.innerHTML = '<div class="refs-empty">No se pudo conectar al backend.</div>'
+    body.innerHTML = '<div class="refs-empty">Could not connect to backend.</div>'
   }
 }
 
@@ -69,7 +69,7 @@ function renderRefs(query = '') {
     : allItems
 
   if (items.length === 0) {
-    body.innerHTML = `<div class="refs-empty">${q ? 'Sin resultados.' : 'Sin referencias.'}</div>`
+    body.innerHTML = `<div class="refs-empty">${q ? 'No results.' : 'No references.'}</div>`
     return
   }
 

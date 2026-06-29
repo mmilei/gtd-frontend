@@ -12,7 +12,7 @@ export function initTriage() {
     <div class="triage-box">
       <div class="triage-header">
         <span class="triage-progress"></span>
-        <button class="triage-close-btn">✕ Cerrar</button>
+        <button class="triage-close-btn">✕ Close</button>
       </div>
       <div class="triage-item">
         <div class="triage-title"></div>
@@ -21,10 +21,10 @@ export function initTriage() {
         <div class="triage-tags"></div>
       </div>
       <div class="triage-actions">
-        <button data-action="today">⚡ Hoy</button>
+        <button data-action="today">⚡ Today</button>
         <button data-action="backlog">📋 Skip</button>
-        <button data-action="someday">🌱 Algún día</button>
-        <button data-action="dismiss">✕ Descartar</button>
+        <button data-action="someday">🌱 Someday</button>
+        <button data-action="dismiss">✕ Dismiss</button>
       </div>
     </div>
   `
@@ -47,7 +47,7 @@ export async function openTriage() {
   currentIndex = 0
   overlay.classList.remove('hidden')
   if (queue.length === 0) {
-    showMessage('Backlog vacío ✓')
+    showMessage('Empty backlog ✓')
   } else {
     restoreActions()
     showItem(0)
@@ -62,7 +62,7 @@ function closeTriage() {
 
 function showItem(index) {
   if (index >= queue.length) {
-    showMessage('✓ Bandeja procesada')
+    showMessage('✓ Inbox cleared')
     return
   }
   const item = queue[index]
@@ -71,7 +71,7 @@ function showItem(index) {
 
   const parts = []
   if (item.created) parts.push(item.created)
-  if (item.due) parts.push(`vence: ${item.due}`)
+  if (item.due) parts.push(`due: ${item.due}`)
   if (item.delegado_a) parts.push(`→ ${item.delegado_a}`)
   overlay.querySelector('.triage-meta').textContent = parts.join(' · ')
 

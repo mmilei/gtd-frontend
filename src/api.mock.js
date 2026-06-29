@@ -13,25 +13,25 @@ function makeFilename(title) {
 
 const state = {
   today: [
-    { filename: '20260628-090000-revisar-pull-request.md', bucket: 'today', title: 'Revisar pull request del equipo', due: todayStr(), tags: ['trabajo', 'código'], body: '', created: '2026-06-28', today_since: '2026-06-28' },
-    { filename: '20260628-095500-call-the-dentist.md',    bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['salud'], body: '', created: '2026-06-28', today_since: '2026-06-28' },
+    { filename: '20260628-090000-review-team-pull-request.md', bucket: 'today', title: 'Review team pull request', due: todayStr(), tags: ['work', 'code'], body: '', created: '2026-06-28', today_since: '2026-06-28' },
+    { filename: '20260628-095500-call-the-dentist.md',         bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['health'], body: '', created: '2026-06-28', today_since: '2026-06-28' },
   ],
   backlog: [
-    { filename: '20260627-150000-armar-readme-del-proyecto.md', bucket: 'backlog', title: 'Armar README del proyecto', tags: ['trabajo'], body: '', created: '2026-06-27' },
+    { filename: '20260627-150000-write-project-readme.md', bucket: 'backlog', title: 'Write project README', tags: ['work'], body: '', created: '2026-06-27' },
   ],
   waiting: [
-    { filename: '20260625-110000-esperar-respuesta-diseno.md', bucket: 'waiting', title: 'Esperar respuesta del equipo de diseño', delegado_a: 'equipo diseño', tags: [], body: '', created: '2026-06-25' },
+    { filename: '20260625-110000-wait-for-design-team.md', bucket: 'waiting', title: 'Wait for design team response', delegado_a: 'design team', tags: [], body: '', created: '2026-06-25' },
   ],
   someday: [
-    { filename: '20260620-120000-aprender-rust.md', bucket: 'someday', title: 'Aprender Rust', tags: [], body: '', created: '2026-06-20' },
+    { filename: '20260620-120000-learn-rust.md', bucket: 'someday', title: 'Learn Rust', tags: [], body: '', created: '2026-06-20' },
   ],
   reference: [
     {
       filename: '20260615-080000-gtd-getting-things-done.md',
       bucket: 'reference',
       title: 'GTD — Getting Things Done',
-      tags: ['productividad', 'metodologia'],
-      body: 'Sistema de organización personal de David Allen.\n\n- **now**: 2 min o menos, hacerlo ya\n- **today**: pendiente para hoy\n- **backlog**: algún día, sin fecha\n- **waiting**: delegado, esperando respuesta\n- **someday**: quizás, sin compromiso\n- **reference**: información, sin acción',
+      tags: ['productivity', 'methodology'],
+      body: 'Personal organization system by David Allen.\n\n- **now**: 2 min or less, do it immediately\n- **today**: pending for today\n- **backlog**: someday, no date\n- **waiting**: delegated, awaiting response\n- **someday**: maybe, no commitment\n- **reference**: information, no action required',
       created: '2026-06-15',
     },
   ],

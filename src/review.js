@@ -11,12 +11,12 @@ export function initReview(onRefresh) {
   panel.innerHTML = `
     <div class="review-header">
       <span class="review-title">Weekly Review</span>
-      <button id="review-refresh" class="review-refresh-btn" title="Actualizar">↻</button>
-      <button id="review-close" class="review-close-btn" title="Cerrar">✕</button>
+      <button id="review-refresh" class="review-refresh-btn" title="Refresh">↻</button>
+      <button id="review-close" class="review-close-btn" title="Close">✕</button>
     </div>
     <div id="review-stats" class="review-stats"></div>
     <div id="review-body" class="review-body">
-      <div class="review-loading">Cargando…</div>
+      <div class="review-loading">Loading…</div>
     </div>
   `
   document.body.appendChild(panel)
@@ -48,11 +48,11 @@ async function loadReview() {
     const data = await getReview()
     renderStats(stats, data.week_stats)
     body.innerHTML = ''
-    renderSection(body, 'Stale (3+ días en Today)', data.stale_today,   'stale',     true)
-    renderSection(body, 'Vence esta semana',         data.due_this_week, 'due-soon',  false)
-    renderSection(body, 'Completado esta semana',    data.completed_this_week, 'done-week', false)
+    renderSection(body, 'Stale (3+ days in Today)', data.stale_today,   'stale',     true)
+    renderSection(body, 'Due this week',             data.due_this_week, 'due-soon',  false)
+    renderSection(body, 'Completed this week',       data.completed_this_week, 'done-week', false)
   } catch (e) {
-    body.innerHTML = `<div class="review-error">Error al cargar: ${e.message}</div>`
+    body.innerHTML = `<div class="review-error">Failed to load: ${e.message}</div>`
   }
 }
 
@@ -60,8 +60,8 @@ function renderStats(container, stats) {
   if (!stats) return
   container.innerHTML = `
     <span class="stat-chip stale-chip">${stats.stale} stale</span>
-    <span class="stat-chip done-chip">${stats.completed} completadas</span>
-    <span class="stat-chip due-chip">${stats.due_soon} vencen pronto</span>
+    <span class="stat-chip done-chip">${stats.completed} completed</span>
+    <span class="stat-chip due-chip">${stats.due_soon} due soon</span>
   `
 }
 
@@ -77,7 +77,7 @@ function renderSection(container, title, items, cls, withActions) {
   if (!items.length) {
     const empty = document.createElement('div')
     empty.className = 'review-empty'
-    empty.textContent = 'Ninguno'
+    empty.textContent = 'None'
     section.appendChild(empty)
     container.appendChild(section)
     return

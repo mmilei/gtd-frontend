@@ -23,13 +23,13 @@ export function initToast() {
     <div class="toast-content">
       <span class="toast-icon"></span>
       <span class="toast-title"></span>
-      <button class="toast-adjust">Ajustar ▾</button>
+      <button class="toast-adjust">Adjust ▾</button>
     </div>
     <div class="toast-actions hidden">
-      <button data-action="today">⚡ Hoy</button>
+      <button data-action="today">⚡ Today</button>
       <button data-action="backlog">📋 Backlog</button>
       <button data-action="someday">🌱 Someday</button>
-      <button data-action="dismiss">✕ Descartar</button>
+      <button data-action="dismiss">✕ Dismiss</button>
     </div>
     <div class="toast-bar"></div>
   `
