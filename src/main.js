@@ -28,7 +28,7 @@ const statusLabel = document.getElementById('api-label')
 
 async function checkApi() {
   statusDot.className = 'status-dot loading'
-  statusLabel.textContent = 'conectando…'
+  statusLabel.textContent = 'connecting…'
   const ok = await ping()
   if (ok) {
     statusDot.className = 'status-dot online'
@@ -46,7 +46,7 @@ setInterval(checkApi, 30_000)
 if (import.meta.env.VITE_MOCK === 'true') {
   const banner = document.createElement('div')
   banner.className = 'demo-banner'
-  banner.textContent = 'Modo demo — los datos son ficticios y se reinician al recargar'
+  banner.textContent = 'Demo mode — data is fictional and resets on reload'
   document.getElementById('header').appendChild(banner)
 }
 
@@ -59,8 +59,8 @@ const sendBtn    = document.getElementById('send-btn')
 messagesEl.innerHTML = `
   <div class="welcome-msg">
     <h2>GTD Brain</h2>
-    <p>Escribí cualquier cosa: una tarea, un pensamiento, algo para delegar.<br>
-    El modelo lo clasifica y archiva en tu vault de Obsidian.</p>
+    <p>Type anything: a task, a thought, something to delegate.<br>
+    The model classifies and archives it in your Obsidian vault.</p>
   </div>
 `
 
@@ -184,7 +184,7 @@ function buildOpCard(op) {
       <div class="op-top">
         <span class="op-type">${escHtml(op.op || 'op')}</span>
         ${badgeHtml}
-        ${op.filed ? '<span style="font-size:11px;color:var(--now)">✓ archivado</span>' : '<span style="font-size:11px;color:var(--discard)">✗ no archivado</span>'}
+        ${op.filed ? '<span style="font-size:11px;color:var(--now)">✓ filed</span>' : '<span style="font-size:11px;color:var(--discard)">✗ not filed</span>'}
       </div>
       ${details}
     </div>
@@ -201,7 +201,7 @@ function appendError(msg) {
       <div class="op-icon" style="background:rgba(239,68,68,0.15)">⚠️</div>
       <div class="op-content">
         <div class="op-error">${escHtml(msg)}</div>
-        <div class="op-file">¿El servidor Java está corriendo en :8080?</div>
+        <div class="op-file">Is the Java server running on :8080?</div>
       </div>
     </div>
   `
@@ -263,7 +263,7 @@ micBtn.addEventListener('click', async () => {
             pulse()
           }
         } catch (err) {
-          appendError('Transcripción fallida: ' + err.message)
+          appendError('Transcription failed: ' + err.message)
         } finally {
           setMicState('idle')
           if (pendingSend) { pendingSend = false; sendMessage() }
@@ -293,7 +293,7 @@ micBtn.addEventListener('click', async () => {
 
       setMicState('recording')
     } catch {
-      appendError('No se pudo acceder al micrófono.')
+      appendError('Could not access microphone.')
     }
   } else if (micState === 'recording') {
     if (recognition) { recognition.stop(); recognition = null }

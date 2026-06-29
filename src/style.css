@@ -1319,7 +1319,7 @@ html, body {
 .toast-bar {
   height: 2px;
   width: 100%;
-  animation: toast-shrink 3s linear forwards;
+  animation: toast-shrink 10s linear forwards;
 }
 @keyframes toast-shrink {
   from { width: 100%; }

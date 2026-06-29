@@ -2,7 +2,7 @@ import { getBuckets, getToday, markDone } from './api.js'
 import { openModal, updateTagSuggestions } from './modal.js'
 
 const BUCKET_META = {
-  today:     { label: 'Hoy',     color: 'var(--today)',     icon: '⚡' },
+  today:     { label: 'Today',   color: 'var(--today)',     icon: '⚡' },
   backlog:   { label: 'Backlog', color: 'var(--backlog)',   icon: '📋' },
   waiting:   { label: 'Waiting', color: 'var(--waiting)',   icon: '⏳' },
   someday:   { label: 'Someday', color: 'var(--someday)',   icon: '🌱' },
@@ -100,7 +100,7 @@ function renderItems() {
     : all
 
   if (items.length === 0) {
-    el.innerHTML = `<div class="empty-state"><p>${selectedTag ? `Sin ítems con #${escHtml(selectedTag)}` : 'Sin ítems'}</p></div>`
+    el.innerHTML = `<div class="empty-state"><p>${selectedTag ? `No items with #${escHtml(selectedTag)}` : 'No items'}</p></div>`
     return
   }
 
@@ -161,7 +161,7 @@ function itemCard(item, meta) {
       </div>
       ${snippet ? `<div class="item-preview">${escHtml(snippet)}</div>` : ''}
       ${tags.length ? `<div class="item-tags">${tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
-      <button class="done-btn" data-file="${escAttr(item.file)}" title="Marcar como hecho">
+      <button class="done-btn" data-file="${escAttr(item.file)}" title="Mark as done">
         ${circleSVG()}
       </button>
     </div>

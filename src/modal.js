@@ -3,7 +3,7 @@ import { fetchItem, replaceBody, patchMeta, markdownifyItem, moveItem, markDone 
 const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
 
 const BUCKET_META = {
-  today:     { icon: '⚡', color: 'var(--today)',     label: 'Hoy' },
+  today:     { icon: '⚡', color: 'var(--today)',     label: 'Today' },
   backlog:   { icon: '📋', color: 'var(--backlog)',   label: 'Backlog' },
   waiting:   { icon: '⏳', color: 'var(--waiting)',   label: 'Waiting' },
   someday:   { icon: '🌱', color: 'var(--someday)',   label: 'Someday' },
@@ -34,17 +34,17 @@ export function initModal(onSave) {
         </div>
         <div class="modal-dates-row">
           <div class="modal-field">
-            <label class="modal-field-label">Fecha límite</label>
+            <label class="modal-field-label">Due date</label>
             <input type="date" id="modal-due" class="modal-date-input">
           </div>
           <div class="modal-field" id="modal-today-since-field" style="display:none">
-            <label class="modal-field-label">En today desde</label>
+            <label class="modal-field-label">In today since</label>
             <input type="date" id="modal-today-since" class="modal-date-input">
           </div>
         </div>
         <div class="modal-field" id="modal-delegado-field" style="display:none">
-          <label class="modal-field-label">Delegado a</label>
-          <input type="text" id="modal-delegado" class="modal-date-input" placeholder="Nombre o equipo">
+          <label class="modal-field-label">Delegated to</label>
+          <input type="text" id="modal-delegado" class="modal-date-input" placeholder="Name or team">
         </div>
         <div class="modal-field modal-field-conditional" id="modal-area-field">
           <label class="modal-field-label">Area</label>
@@ -53,10 +53,10 @@ export function initModal(onSave) {
       </div>
       <datalist id="modal-tag-suggestions"></datalist>
       <div class="modal-actions">
-        <button id="modal-done" class="modal-done-btn">✓ Hecho</button>
-        <button id="modal-cancel">Cancelar</button>
-        <button id="modal-markdownify" class="modal-markdownify-btn" title="Enriquecer con IA">✨ Mejorar</button>
-        <button id="modal-save">Guardar <kbd>Ctrl+Enter</kbd></button>
+        <button id="modal-done" class="modal-done-btn">✓ Done</button>
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-markdownify" class="modal-markdownify-btn" title="Enrich with AI">✨ Improve</button>
+        <button id="modal-save">Save <kbd>Ctrl+Enter</kbd></button>
       </div>
     </div>
   `
@@ -72,14 +72,14 @@ export function initModal(onSave) {
     if (!currentFile) return
     const btn = document.getElementById('modal-done')
     btn.disabled = true
-    btn.textContent = '✓ Marcando…'
+    btn.textContent = '✓ Marking…'
     try {
       await markDone(currentFile)
       closeModal()
       if (onSaveCallback) await onSaveCallback()
     } catch {
       btn.disabled = false
-      btn.textContent = '✓ Hecho'
+      btn.textContent = '✓ Done'
     }
   })
 
@@ -110,7 +110,7 @@ export function openModal(filename) {
   tsEl.value    = ''
   if (delEl)  delEl.value  = ''
   if (areaEl) areaEl.value = ''
-  saveBtn.innerHTML = 'Guardar <kbd>Ctrl+Enter</kbd>'
+  saveBtn.innerHTML = 'Save <kbd>Ctrl+Enter</kbd>'
   saveBtn.disabled  = true
   renderBucketSelector()
   renderTagPills()
@@ -137,7 +137,7 @@ export function openModal(filename) {
 
       const mdBtn = document.getElementById('modal-markdownify')
       mdBtn.disabled = !!item.markdownified
-      mdBtn.title    = item.markdownified ? 'Ya fue mejorada con IA' : 'Enriquecer con IA'
+      mdBtn.title    = item.markdownified ? 'Already improved with AI' : 'Enrich with AI'
 
       saveBtn.disabled = false
       titleEl.focus()
@@ -214,7 +214,7 @@ function renderTagPills() {
   const pills = userTags.map(t => `
     <span class="modal-tag-pill">
       ${escHtml(t)}
-      <button class="tag-remove-btn" data-tag="${escAttr(t)}" title="Quitar tag">×</button>
+      <button class="tag-remove-btn" data-tag="${escAttr(t)}" title="Remove tag">×</button>
     </span>
   `).join('')
 
@@ -271,7 +271,7 @@ async function runMarkdownify() {
   const bodyEl = document.getElementById('modal-body')
 
   mdBtn.disabled    = true
-  mdBtn.textContent = '✨ Mejorando…'
+  mdBtn.textContent = '✨ Improving…'
 
   try {
     const result = await markdownifyItem(currentFile)
@@ -280,11 +280,11 @@ async function runMarkdownify() {
       currentTags = result.tags
       renderTagPills()
     }
-    mdBtn.textContent = '✨ Mejorar'
-    mdBtn.title = 'Ya fue mejorada con IA'
+    mdBtn.textContent = '✨ Improve'
+    mdBtn.title = 'Already improved with AI'
   } catch {
     mdBtn.disabled    = false
-    mdBtn.textContent = '✨ Error — reintentar'
+    mdBtn.textContent = '✨ Error — retry'
   }
 }
 
@@ -298,7 +298,7 @@ async function saveModal() {
   const newDel   = document.getElementById('modal-delegado')?.value.trim() || null
 
   saveBtn.disabled    = true
-  saveBtn.textContent = 'Guardando…'
+  saveBtn.textContent = 'Saving…'
 
   try {
     const orig = originalItem || {}
@@ -346,7 +346,7 @@ async function saveModal() {
     if (onSaveCallback) await onSaveCallback()
   } catch {
     saveBtn.disabled  = false
-    saveBtn.innerHTML = 'Error — reintentar'
+    saveBtn.innerHTML = 'Error — retry'
   }
 }
 
