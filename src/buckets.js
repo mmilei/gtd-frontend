@@ -1,5 +1,5 @@
 import { getBuckets, getToday, markDone } from './api.js'
-import { openModal } from './modal.js'
+import { openModal, updateTagSuggestions } from './modal.js'
 
 const BUCKET_META = {
   today:     { label: 'Hoy',     color: 'var(--today)',     icon: '⚡' },
@@ -31,6 +31,7 @@ export async function refreshBuckets() {
   try {
     const [all, today] = await Promise.all([getBuckets(), getToday()])
     bucketData = { ...all, today }
+    updateTagSuggestions(Object.values(bucketData).flat())
     renderCounts()
     renderTagBar()
     renderItems()

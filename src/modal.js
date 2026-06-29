@@ -46,7 +46,12 @@ export function initModal(onSave) {
           <label class="modal-field-label">Delegado a</label>
           <input type="text" id="modal-delegado" class="modal-date-input" placeholder="Nombre o equipo">
         </div>
+        <div class="modal-field modal-field-conditional" id="modal-area-field">
+          <label class="modal-field-label">Area</label>
+          <input type="text" id="modal-area" class="modal-date-input" placeholder="e.g. work, health, finance">
+        </div>
       </div>
+      <datalist id="modal-tag-suggestions"></datalist>
       <div class="modal-actions">
         <button id="modal-done" class="modal-done-btn">✓ Hecho</button>
         <button id="modal-cancel">Cancelar</button>
@@ -97,12 +102,14 @@ export function openModal(filename) {
   const dueEl   = document.getElementById('modal-due')
   const tsEl    = document.getElementById('modal-today-since')
   const delEl   = document.getElementById('modal-delegado')
+  const areaEl  = document.getElementById('modal-area')
 
   titleEl.value = '…'
   bodyEl.value  = ''
   dueEl.value   = ''
   tsEl.value    = ''
-  if (delEl) delEl.value = ''
+  if (delEl)  delEl.value  = ''
+  if (areaEl) areaEl.value = ''
   saveBtn.innerHTML = 'Guardar <kbd>Ctrl+Enter</kbd>'
   saveBtn.disabled  = true
   renderBucketSelector()
@@ -121,7 +128,8 @@ export function openModal(filename) {
       bodyEl.value  = item.body  || ''
       dueEl.value   = item.due   || ''
       tsEl.value    = item.today_since || ''
-      if (delEl) delEl.value = item.delegado_a || ''
+      if (delEl)  delEl.value  = item.delegado_a || ''
+      if (areaEl) areaEl.value = item.area || ''
 
       renderBucketSelector()
       renderTagPills()
@@ -192,6 +200,8 @@ function updateConditionalFields(bucket) {
     delField.classList.toggle('modal-field-conditional', true)
     delField.classList.toggle('visible', bucket === 'waiting')
   }
+  const areaField = document.getElementById('modal-area-field')
+  if (areaField) areaField.classList.toggle('visible', bucket === 'reference')
   if (mdBtn) mdBtn.style.display = bucket === 'reference' ? 'none' : ''
 }
 
@@ -209,7 +219,7 @@ function renderTagPills() {
   `).join('')
 
   container.innerHTML = pills + `
-    <input type="text" id="modal-tag-input" class="modal-tag-input" placeholder="+ tag">
+    <input type="text" id="modal-tag-input" class="modal-tag-input" placeholder="+ tag" list="modal-tag-suggestions">
   `
 
   container.querySelectorAll('.tag-remove-btn').forEach(btn => {
@@ -327,6 +337,9 @@ async function saveModal() {
       meta.delegado_a = newDel
     }
 
+    const areaVal = document.getElementById('modal-area')?.value.trim() || null
+    if (areaVal !== (orig.area || null)) meta.area = areaVal
+
     if (Object.keys(meta).length > 0) await patchMeta(currentFile, meta)
 
     closeModal()
@@ -335,6 +348,14 @@ async function saveModal() {
     saveBtn.disabled  = false
     saveBtn.innerHTML = 'Error — reintentar'
   }
+}
+
+export function updateTagSuggestions(items) {
+  const dl = document.getElementById('modal-tag-suggestions')
+  if (!dl) return
+  const tags = new Set()
+  items.forEach(item => (item.tags || []).forEach(t => tags.add(t)))
+  dl.innerHTML = [...tags].map(t => `<option value="${escAttr(t)}">`).join('')
 }
 
 function escHtml(s) {
