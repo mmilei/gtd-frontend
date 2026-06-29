@@ -1,11 +1,20 @@
-import { fetchItem, replaceBody, patchMeta, markdownifyItem } from './api.js'
+import { fetchItem, replaceBody, patchMeta, markdownifyItem, moveItem, markDone } from './api.js'
 
 const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
+
+const BUCKET_META = {
+  today:     { icon: '⚡', color: 'var(--today)',     label: 'Hoy' },
+  backlog:   { icon: '📋', color: 'var(--backlog)',   label: 'Backlog' },
+  waiting:   { icon: '⏳', color: 'var(--waiting)',   label: 'Waiting' },
+  someday:   { icon: '🌱', color: 'var(--someday)',   label: 'Someday' },
+  reference: { icon: '📚', color: 'var(--reference)', label: 'Ref' },
+}
 
 let onSaveCallback = null
 let currentFile    = null
 let originalItem   = null
 let currentTags    = []
+let currentBucket  = null
 
 export function initModal(onSave) {
   onSaveCallback = onSave
@@ -15,7 +24,7 @@ export function initModal(onSave) {
   overlay.className = 'modal-overlay hidden'
   overlay.innerHTML = `
     <div class="modal-box">
-      <div class="modal-label">Editando</div>
+      <div class="modal-bucket-selector" id="modal-bucket-selector"></div>
       <input type="text" id="modal-item-title" class="modal-title-input" spellcheck="false">
       <textarea id="modal-body" class="modal-textarea" spellcheck="false"></textarea>
       <div class="modal-meta-section">
@@ -33,8 +42,13 @@ export function initModal(onSave) {
             <input type="date" id="modal-today-since" class="modal-date-input">
           </div>
         </div>
+        <div class="modal-field" id="modal-delegado-field" style="display:none">
+          <label class="modal-field-label">Delegado a</label>
+          <input type="text" id="modal-delegado" class="modal-date-input" placeholder="Nombre o equipo">
+        </div>
       </div>
       <div class="modal-actions">
+        <button id="modal-done" class="modal-done-btn">✓ Hecho</button>
         <button id="modal-cancel">Cancelar</button>
         <button id="modal-markdownify" class="modal-markdownify-btn" title="Enriquecer con IA">✨ Mejorar</button>
         <button id="modal-save">Guardar <kbd>Ctrl+Enter</kbd></button>
@@ -49,6 +63,20 @@ export function initModal(onSave) {
   document.getElementById('modal-cancel').addEventListener('click', closeModal)
   document.getElementById('modal-save').addEventListener('click', saveModal)
   document.getElementById('modal-markdownify').addEventListener('click', runMarkdownify)
+  document.getElementById('modal-done').addEventListener('click', async () => {
+    if (!currentFile) return
+    const btn = document.getElementById('modal-done')
+    btn.disabled = true
+    btn.textContent = '✓ Marcando…'
+    try {
+      await markDone(currentFile)
+      closeModal()
+      if (onSaveCallback) await onSaveCallback()
+    } catch {
+      btn.disabled = false
+      btn.textContent = '✓ Hecho'
+    }
+  })
 
   document.addEventListener('keydown', e => {
     if (!isOpen()) return
@@ -58,52 +86,51 @@ export function initModal(onSave) {
 }
 
 export function openModal(filename) {
-  currentFile  = filename
-  originalItem = null
-  currentTags  = []
+  currentFile   = filename
+  originalItem  = null
+  currentTags   = []
+  currentBucket = null
 
-  const titleEl    = document.getElementById('modal-item-title')
-  const bodyEl     = document.getElementById('modal-body')
-  const saveBtn    = document.getElementById('modal-save')
-  const dueEl      = document.getElementById('modal-due')
-  const tsField    = document.getElementById('modal-today-since-field')
-  const tsEl       = document.getElementById('modal-today-since')
+  const titleEl = document.getElementById('modal-item-title')
+  const bodyEl  = document.getElementById('modal-body')
+  const saveBtn = document.getElementById('modal-save')
+  const dueEl   = document.getElementById('modal-due')
+  const tsEl    = document.getElementById('modal-today-since')
+  const delEl   = document.getElementById('modal-delegado')
 
-  titleEl.value    = '…'
-  bodyEl.value     = ''
-  dueEl.value      = ''
-  tsEl.value       = ''
-  tsField.style.display = 'none'
+  titleEl.value = '…'
+  bodyEl.value  = ''
+  dueEl.value   = ''
+  tsEl.value    = ''
+  if (delEl) delEl.value = ''
   saveBtn.innerHTML = 'Guardar <kbd>Ctrl+Enter</kbd>'
   saveBtn.disabled  = true
+  renderBucketSelector()
   renderTagPills()
+  updateConditionalFields(null)
 
   document.getElementById('edit-modal').classList.remove('hidden')
 
   fetchItem(filename)
     .then(item => {
-      originalItem = item
-      currentTags  = Array.isArray(item.tags) ? [...item.tags] : []
+      originalItem  = item
+      currentTags   = Array.isArray(item.tags) ? [...item.tags] : []
+      currentBucket = item.bucket || null
 
       titleEl.value = item.title || item.file || filename
-      bodyEl.value  = item.body || ''
-      dueEl.value   = item.due || ''
+      bodyEl.value  = item.body  || ''
+      dueEl.value   = item.due   || ''
+      tsEl.value    = item.today_since || ''
+      if (delEl) delEl.value = item.delegado_a || ''
 
-      if (item.bucket === 'today') {
-        tsField.style.display = 'block'
-        tsEl.value = item.today_since || ''
-      }
+      renderBucketSelector()
+      renderTagPills()
+      updateConditionalFields(currentBucket)
 
       const mdBtn = document.getElementById('modal-markdownify')
-      if (item.bucket === 'reference') {
-        mdBtn.style.display = 'none'
-      } else {
-        mdBtn.style.display = ''
-        mdBtn.disabled = !!item.markdownified
-        mdBtn.title = item.markdownified ? 'Ya fue mejorada con IA' : 'Enriquecer con IA'
-      }
+      mdBtn.disabled = !!item.markdownified
+      mdBtn.title    = item.markdownified ? 'Ya fue mejorada con IA' : 'Enriquecer con IA'
 
-      renderTagPills()
       saveBtn.disabled = false
       titleEl.focus()
       titleEl.select()
@@ -117,14 +144,55 @@ export function openModal(filename) {
 
 export function closeModal() {
   document.getElementById('edit-modal').classList.add('hidden')
-  currentFile  = null
-  originalItem = null
-  currentTags  = []
+  currentFile   = null
+  originalItem  = null
+  currentTags   = []
+  currentBucket = null
 }
 
 export function isOpen() {
   const el = document.getElementById('edit-modal')
   return el && !el.classList.contains('hidden')
+}
+
+function renderBucketSelector() {
+  const container = document.getElementById('modal-bucket-selector')
+  if (!container) return
+
+  container.innerHTML = Object.entries(BUCKET_META).map(([key, meta]) => {
+    const isActive = key === currentBucket
+    return `<button
+      class="modal-bucket-chip${isActive ? ' active' : ''}"
+      data-bucket="${key}"
+    >${meta.icon} ${meta.label}</button>`
+  }).join('')
+
+  container.querySelectorAll('.modal-bucket-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentBucket = btn.dataset.bucket
+      renderBucketSelector()
+      updateConditionalFields(currentBucket)
+    })
+  })
+}
+
+function updateConditionalFields(bucket) {
+  const tsField  = document.getElementById('modal-today-since-field')
+  const delField = document.getElementById('modal-delegado-field')
+  const mdBtn    = document.getElementById('modal-markdownify')
+  const box      = document.querySelector('.modal-box')
+
+  if (box) box.dataset.bucket = bucket || ''
+
+  if (tsField) {
+    tsField.classList.toggle('modal-field-conditional', true)
+    tsField.classList.toggle('visible', bucket === 'today')
+  }
+  if (delField) {
+    delField.classList.toggle('modal-field-conditional', true)
+    delField.classList.toggle('visible', bucket === 'waiting')
+  }
+  if (mdBtn) mdBtn.style.display = bucket === 'reference' ? 'none' : ''
 }
 
 function renderTagPills() {
@@ -212,30 +280,52 @@ async function runMarkdownify() {
 
 async function saveModal() {
   if (!currentFile) return
-  const saveBtn = document.getElementById('modal-save')
+  const saveBtn  = document.getElementById('modal-save')
   const newBody  = document.getElementById('modal-body').value
   const newTitle = document.getElementById('modal-item-title').value.trim()
   const newDue   = document.getElementById('modal-due').value || null
   const newTs    = document.getElementById('modal-today-since').value || null
+  const newDel   = document.getElementById('modal-delegado')?.value.trim() || null
 
   saveBtn.disabled    = true
   saveBtn.textContent = 'Guardando…'
 
   try {
     const orig = originalItem || {}
+    const today = new Date().toISOString().slice(0, 10)
 
-    const bodyChanged = newBody !== (orig.body || '')
-    if (bodyChanged) await replaceBody(currentFile, newBody)
+    // 1. Bucket change
+    if (currentBucket && currentBucket !== orig.bucket) {
+      await moveItem(currentFile, currentBucket,
+        currentBucket === 'today' ? (newDue || null) : null
+      )
+    }
 
+    // 2. Body
+    if (newBody !== (orig.body || '')) await replaceBody(currentFile, newBody)
+
+    // 3. Meta patch
     if (!currentTags.includes('gtd')) currentTags.unshift('gtd')
 
     const meta = {}
     if (newTitle && newTitle !== (orig.title || '')) meta.title = newTitle
+
     const sortedCurrent = [...currentTags].sort()
-    const sortedOrig = [...(orig.tags || [])].sort()
+    const sortedOrig    = [...(orig.tags || [])].sort()
     if (JSON.stringify(sortedCurrent) !== JSON.stringify(sortedOrig)) meta.tags = currentTags
+
     if (newDue !== (orig.due || null)) meta.due = newDue
-    if (newTs  !== (orig.today_since || null)) meta.today_since = newTs
+
+    // Auto-set today_since when moving to today
+    if (currentBucket === 'today' && !orig.today_since && !newTs) {
+      meta.today_since = today
+    } else if (newTs !== (orig.today_since || null)) {
+      meta.today_since = newTs
+    }
+
+    if (currentBucket === 'waiting' && newDel !== (orig.delegado_a || null)) {
+      meta.delegado_a = newDel
+    }
 
     if (Object.keys(meta).length > 0) await patchMeta(currentFile, meta)
 

@@ -822,8 +822,11 @@ html, body {
 }
 
 .modal-box {
+  --modal-accent:     #6366f1;
+  --modal-accent-rgb: 99,102,241;
   background: #0e0e1a;
   border: 1px solid var(--border-strong);
+  border-top: 2px solid var(--modal-accent);
   border-radius: 16px;
   padding: 24px;
   width: 500px;
@@ -832,16 +835,50 @@ html, body {
   flex-direction: column;
   gap: 14px;
   animation: slide-up 0.18s ease;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(var(--modal-accent-rgb),0.12);
+  transition: box-shadow 0.2s, border-top-color 0.2s;
 }
 
-.modal-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--muted);
+/* Bucket-aware accent theming */
+.modal-box[data-bucket="today"]     { --modal-accent: var(--today);     --modal-accent-rgb: 6,182,212;     }
+.modal-box[data-bucket="backlog"]   { --modal-accent: var(--backlog);   --modal-accent-rgb: 99,102,241;    }
+.modal-box[data-bucket="waiting"]   { --modal-accent: var(--waiting);   --modal-accent-rgb: 245,158,11;    }
+.modal-box[data-bucket="someday"]   { --modal-accent: var(--someday);   --modal-accent-rgb: 16,185,129;    }
+.modal-box[data-bucket="reference"] { --modal-accent: var(--reference); --modal-accent-rgb: 100,116,139;   }
+
+/* ─── Modal bucket selector ─────────────────────────────── */
+.modal-bucket-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
+
+.modal-bucket-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  transition: all 0.15s;
+  letter-spacing: 0.2px;
+}
+.modal-bucket-chip:hover {
+  color: var(--text);
+  border-color: rgba(255,255,255,0.25);
+  background: var(--surface);
+}
+.modal-bucket-chip.active[data-bucket="today"]     { background: rgba(6,182,212,0.15);   border-color: var(--today);     color: var(--today);     }
+.modal-bucket-chip.active[data-bucket="backlog"]   { background: rgba(99,102,241,0.15);  border-color: var(--backlog);   color: var(--backlog);   }
+.modal-bucket-chip.active[data-bucket="waiting"]   { background: rgba(245,158,11,0.15);  border-color: var(--waiting);   color: var(--waiting);   }
+.modal-bucket-chip.active[data-bucket="someday"]   { background: rgba(16,185,129,0.15);  border-color: var(--someday);   color: var(--someday);   }
+.modal-bucket-chip.active[data-bucket="reference"] { background: rgba(100,116,139,0.15); border-color: var(--reference); color: var(--reference); }
 
 .modal-title-input {
   font-size: 15px;
@@ -857,7 +894,7 @@ html, body {
   font-family: inherit;
   transition: border-color 0.2s;
 }
-.modal-title-input:focus { border-bottom-color: rgba(99,102,241,0.5); }
+.modal-title-input:focus { border-bottom-color: rgba(var(--modal-accent-rgb),0.6); }
 
 .modal-textarea {
   background: var(--surface);
@@ -876,8 +913,8 @@ html, body {
   box-sizing: border-box;
 }
 .modal-textarea:focus {
-  border-color: rgba(99,102,241,0.5);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
+  border-color: rgba(var(--modal-accent-rgb),0.5);
+  box-shadow: 0 0 0 3px rgba(var(--modal-accent-rgb),0.08);
 }
 
 .modal-actions {
@@ -905,14 +942,15 @@ html, body {
 #modal-cancel:hover { background: var(--surface-hover); color: var(--text); }
 
 #modal-save {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: rgba(var(--modal-accent-rgb),0.85);
   color: #fff;
-  box-shadow: 0 2px 12px rgba(79,70,229,0.35);
+  box-shadow: 0 2px 12px rgba(var(--modal-accent-rgb),0.35);
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: box-shadow 0.2s, background 0.2s, transform 0.15s;
 }
-#modal-save:hover { box-shadow: 0 4px 18px rgba(79,70,229,0.55); transform: translateY(-1px); }
+#modal-save:hover { background: rgba(var(--modal-accent-rgb),1); box-shadow: 0 4px 18px rgba(var(--modal-accent-rgb),0.55); transform: translateY(-1px); }
 #modal-save:active { transform: translateY(0); }
 #modal-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
@@ -995,6 +1033,18 @@ html, body {
 }
 .modal-dates-row .modal-field { flex: 1; }
 
+/* Smooth show/hide for conditional fields */
+.modal-field-conditional {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.22s ease, opacity 0.18s ease;
+}
+.modal-field-conditional.visible {
+  max-height: 72px;
+  opacity: 1;
+}
+
 .modal-date-input {
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -1008,7 +1058,7 @@ html, body {
   cursor: pointer;
   transition: border-color 0.2s;
 }
-.modal-date-input:focus { border-color: rgba(99,102,241,0.5); }
+.modal-date-input:focus { border-color: rgba(var(--modal-accent-rgb),0.5); }
 .modal-date-input::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
 
 /* ─── Age badges (today bucket) ─────────────────────────── */
@@ -1032,6 +1082,22 @@ html, body {
   color: #ef4444;
   border: 1px solid rgba(239,68,68,0.3);
 }
+
+/* ─── Done button ────────────────────────────────────────── */
+.modal-done-btn {
+  background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.3);
+  color: #10b981;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-right: auto;
+}
+.modal-done-btn:hover:not(:disabled) { background: rgba(16,185,129,0.22); }
+.modal-done-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── Markdownify button ─────────────────────────────────── */
 .modal-markdownify-btn {
