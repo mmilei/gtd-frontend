@@ -16,6 +16,12 @@ export async function getBuckets() {
   return res.json() // { today, backlog, waiting, someday }
 }
 
+export async function getBucket(bucket) {
+  const res = await fetch(`${BASE}/buckets/${encodeURIComponent(bucket)}`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() // [{ file, title, body, bucket, tags, created, due, ... }]
+}
+
 export async function getToday() {
   const res = await fetch(`${BASE}/today`)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

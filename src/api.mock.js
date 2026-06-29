@@ -94,6 +94,10 @@ export async function getBuckets() {
   return Object.fromEntries(Object.entries(state).map(([k, v]) => [k, [...v]]))
 }
 
+export async function getBucket(bucket) {
+  return (state[bucket] || []).map(item => ({ ...item, file: item.filename || item.file }))
+}
+
 export async function getToday() {
   return [...state.today]
 }

@@ -4,6 +4,8 @@ import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
 import { initModal } from './modal.js'
 import { initRefsPanel, refreshIfOpen } from './refs.js'
 import { initReview, openReview } from './review.js'
+import { initTriage, openTriage } from './triage.js'
+import { initToast, showToast } from './toast.js'
 
 // ─── Init Three.js background ──────────────────────────────
 const canvas = document.getElementById('bg-canvas')
@@ -14,8 +16,11 @@ initSidebar()
 initModal(refreshBuckets)
 initRefsPanel()
 initReview(refreshBuckets)
+initTriage()
+initToast()
 
 document.getElementById('review-btn').addEventListener('click', openReview)
+document.getElementById('triage-btn').addEventListener('click', openTriage)
 
 // ─── API health check ───────────────────────────────────────
 const statusDot   = document.getElementById('api-status')
@@ -139,6 +144,7 @@ function appendApiResponse(ops, fallback) {
 
   for (const op of (ops || [])) {
     wrap.appendChild(buildOpCard(op))
+    showToast(op)
   }
   messagesEl.appendChild(wrap)
 }
