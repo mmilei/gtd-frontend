@@ -24,7 +24,6 @@ export function initModal(onSave) {
   overlay.className = 'modal-overlay hidden'
   overlay.innerHTML = `
     <div class="modal-box">
-      <button id="modal-close" class="modal-close-btn" title="Close">×</button>
       <div class="modal-bucket-selector" id="modal-bucket-selector"></div>
       <input type="text" id="modal-item-title" class="modal-title-input" spellcheck="false">
       <textarea id="modal-body" class="modal-textarea" spellcheck="false"></textarea>
@@ -53,6 +52,11 @@ export function initModal(onSave) {
         </div>
       </div>
       <datalist id="modal-tag-suggestions"></datalist>
+      <div class="modal-discard-confirm hidden" id="modal-discard-confirm">
+        <span class="discard-msg">Discard unsaved changes?</span>
+        <button id="modal-discard-yes">Discard</button>
+        <button id="modal-discard-no">Keep editing</button>
+      </div>
       <div class="modal-actions">
         <button id="modal-done" class="modal-done-btn">✓ Done</button>
         <button id="modal-cancel">Cancel</button>
@@ -64,10 +68,14 @@ export function initModal(onSave) {
   document.body.appendChild(overlay)
 
   overlay.addEventListener('click', e => {
-    if (e.target === overlay) closeModal()
+    if (e.target === overlay) tryClose()
   })
-  document.getElementById('modal-close').addEventListener('click', closeModal)
-  document.getElementById('modal-cancel').addEventListener('click', closeModal)
+  document.getElementById('modal-cancel').addEventListener('click', tryClose)
+  document.getElementById('modal-discard-yes').addEventListener('click', () => closeModal())
+  document.getElementById('modal-discard-no').addEventListener('click', hideDiscardConfirm)
+
+  document.querySelector('.modal-box').addEventListener('input', updateCancelBtn)
+  document.querySelector('.modal-box').addEventListener('change', updateCancelBtn)
   document.getElementById('modal-save').addEventListener('click', saveModal)
   document.getElementById('modal-markdownify').addEventListener('click', runMarkdownify)
   document.getElementById('modal-done').addEventListener('click', async () => {
@@ -87,7 +95,7 @@ export function initModal(onSave) {
 
   document.addEventListener('keydown', e => {
     if (!isOpen()) return
-    if (e.key === 'Escape') { closeModal(); return }
+    if (e.key === 'Escape') { tryClose(); return }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { saveModal(); return }
   })
 }
@@ -136,6 +144,7 @@ export function openModal(filename) {
       renderBucketSelector()
       renderTagPills()
       updateConditionalFields(currentBucket)
+      updateCancelBtn()
 
       const mdBtn = document.getElementById('modal-markdownify')
       mdBtn.disabled = !!item.markdownified
@@ -154,6 +163,7 @@ export function openModal(filename) {
 
 export function closeModal() {
   document.getElementById('edit-modal').classList.add('hidden')
+  hideDiscardConfirm()
   currentFile   = null
   originalItem  = null
   currentTags   = []
@@ -182,6 +192,7 @@ function renderBucketSelector() {
       currentBucket = btn.dataset.bucket
       renderBucketSelector()
       updateConditionalFields(currentBucket)
+      updateCancelBtn()
     })
   })
 }
@@ -257,6 +268,7 @@ function addTag(tag) {
   if (clean && !currentTags.includes(clean)) {
     currentTags.push(clean)
     renderTagPills()
+    updateCancelBtn()
     document.getElementById('modal-tag-input')?.focus()
   }
 }
@@ -264,6 +276,7 @@ function addTag(tag) {
 function removeTag(tag) {
   currentTags = currentTags.filter(t => t !== tag)
   renderTagPills()
+  updateCancelBtn()
   document.getElementById('modal-tag-input')?.focus()
 }
 
@@ -288,6 +301,39 @@ async function runMarkdownify() {
     mdBtn.disabled    = false
     mdBtn.textContent = '✨ Error — retry'
   }
+}
+
+function isDirty() {
+  if (!originalItem) return false
+  const title = document.getElementById('modal-item-title').value.trim()
+  const body  = document.getElementById('modal-body').value
+  const due   = document.getElementById('modal-due').value || null
+  return title !== (originalItem.title || '') ||
+    body !== (originalItem.body || '') ||
+    currentBucket !== (originalItem.bucket || null) ||
+    JSON.stringify([...currentTags].sort()) !== JSON.stringify([...(originalItem.tags || [])].sort()) ||
+    due !== (originalItem.due || null)
+}
+
+function updateCancelBtn() {
+  const btn = document.getElementById('modal-cancel')
+  if (btn) btn.textContent = isDirty() ? 'Discard changes' : 'Cancel'
+}
+
+function tryClose() {
+  if (isDirty()) { showDiscardConfirm() } else { closeModal() }
+}
+
+function showDiscardConfirm() {
+  document.getElementById('modal-discard-confirm').classList.remove('hidden')
+  document.querySelector('.modal-actions').classList.add('hidden')
+}
+
+function hideDiscardConfirm() {
+  const el = document.getElementById('modal-discard-confirm')
+  if (el) el.classList.add('hidden')
+  const actions = document.querySelector('.modal-actions')
+  if (actions) actions.classList.remove('hidden')
 }
 
 async function saveModal() {

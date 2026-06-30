@@ -941,6 +941,28 @@ html, body {
 }
 #modal-cancel:hover { background: var(--surface-hover); color: var(--text); }
 
+.modal-discard-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 8px 0 4px;
+}
+.modal-discard-confirm.hidden { display: none; }
+.discard-msg { font-size: 13px; color: var(--muted); }
+#modal-discard-yes {
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; font-family: inherit;
+  cursor: pointer; border: none; background: rgba(239,68,68,0.15); color: #f87171;
+  transition: background 0.15s;
+}
+#modal-discard-yes:hover { background: rgba(239,68,68,0.28); }
+#modal-discard-no {
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; font-family: inherit;
+  cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  transition: background 0.15s;
+}
+#modal-discard-no:hover { background: var(--surface-hover); }
+
 #modal-save {
   background: rgba(var(--modal-accent-rgb),0.85);
   color: #fff;
