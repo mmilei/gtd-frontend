@@ -30,8 +30,9 @@ export function initToast() {
 
   toastEl.querySelector('.toast-edit-btn').addEventListener('click', () => {
     if (!currentFile) return
+    const file = currentFile
     hideToast()
-    openModal(currentFile)
+    openModal(file)
   })
 }
 
