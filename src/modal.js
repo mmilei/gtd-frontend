@@ -344,6 +344,7 @@ async function saveModal() {
 
     if (Object.keys(meta).length > 0) await patchMeta(currentFile, meta)
 
+    saveBtn.disabled = false
     saveBtn.innerHTML = 'Saved ✓'
     setTimeout(() => { saveBtn.innerHTML = 'Save <kbd>Ctrl+Enter</kbd>' }, 1000)
     if (onSaveCallback) await onSaveCallback()
