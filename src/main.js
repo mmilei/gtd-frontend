@@ -1,5 +1,5 @@
 import { initScene } from './scene.js'
-import { chat, ping, transcribe } from './api.js'
+import { chat, ping, transcribe, replaceBody } from './api.js'
 import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
 import { initModal } from './modal.js'
 import { initRefsPanel, refreshIfOpen } from './refs.js'
@@ -149,7 +149,57 @@ function appendApiResponse(ops, fallback) {
   messagesEl.appendChild(wrap)
 }
 
+function buildEditConfirmCard(op) {
+  const el = document.createElement('div')
+  el.className = 'op-card op-card-confirm'
+  el.innerHTML = `
+    <div class="op-confirm-header">
+      <span class="op-icon" style="background:rgba(234,179,8,0.15)">✏️</span>
+      <div class="op-content">
+        <div class="op-top">
+          <span class="op-type">edit</span>
+          <span style="font-size:11px;color:var(--waiting)">awaiting confirmation</span>
+        </div>
+        <div class="op-file">📄 ${escHtml(op.title || op.target_file)}</div>
+      </div>
+    </div>
+    <div class="op-diff">
+      <div class="op-diff-block op-diff-current">
+        <div class="op-diff-label">Current</div>
+        <pre class="op-diff-body">${escHtml(op.current_body || '(empty)')}</pre>
+      </div>
+      <div class="op-diff-block op-diff-proposed">
+        <div class="op-diff-label">Proposed</div>
+        <pre class="op-diff-body">${escHtml(op.proposed_body || '(empty)')}</pre>
+      </div>
+    </div>
+    <div class="op-confirm-actions">
+      <button class="confirm-btn">✓ Confirm</button>
+      <button class="cancel-btn">✕ Cancel</button>
+    </div>
+  `
+  el.querySelector('.confirm-btn').addEventListener('click', async () => {
+    const btn = el.querySelector('.confirm-btn')
+    btn.disabled = true
+    btn.textContent = 'Applying…'
+    try {
+      await replaceBody(op.target_file, op.proposed_body)
+      el.innerHTML = `<div class="op-card" style="opacity:0.6">✓ Edit applied — ${escHtml(op.title || op.target_file)}</div>`
+      await refreshBuckets()
+    } catch {
+      btn.disabled = false
+      btn.textContent = '✓ Confirm'
+    }
+  })
+  el.querySelector('.cancel-btn').addEventListener('click', () => {
+    el.remove()
+  })
+  return el
+}
+
 function buildOpCard(op) {
+  if (op.requires_confirmation) return buildEditConfirmCard(op)
+
   const el = document.createElement('div')
   el.className = 'op-card'
 
