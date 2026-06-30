@@ -75,4 +75,5 @@ function hideToast() {
   if (toastEl) toastEl.classList.add('hidden')
   currentFile = null
   clearTimeout(dismissTimer)
+  drainQueue()
 }
