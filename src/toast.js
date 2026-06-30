@@ -54,8 +54,6 @@ function displayToast(op, onDone) {
 
   toastEl.querySelector('.toast-icon').textContent = meta.icon
   toastEl.querySelector('.toast-title').textContent = op.title || op.file
-  toastEl.querySelector('.toast-actions').classList.add('hidden')
-  toastEl.querySelectorAll('.toast-actions button').forEach(b => b.disabled = false)
 
   const bar = toastEl.querySelector('.toast-bar')
   bar.style.background = meta.color
