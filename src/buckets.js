@@ -1,4 +1,4 @@
-import { getBuckets, getToday, markDone } from './api.js'
+import { getBuckets, getToday, markDone, moveItem, dismissItem } from './api.js'
 import { openModal, updateTagSuggestions } from './modal.js'
 
 const BUCKET_META = {
@@ -107,6 +107,35 @@ function renderItems() {
   const meta = BUCKET_META[currentBucket] || {}
   el.innerHTML = items.map(item => itemCard(item, meta)).join('')
 
+  el.querySelectorAll('.to-today-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation()
+      try {
+        await moveItem(btn.dataset.file, 'today')
+        bucketData[currentBucket] = (bucketData[currentBucket] || []).filter(i => i.file !== btn.dataset.file)
+        renderCounts()
+        renderItems()
+      } catch { /* silently ignore */ }
+    })
+  })
+
+  el.querySelectorAll('.dismiss-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation()
+      const card = btn.closest('.item-card')
+      try {
+        await dismissItem(btn.dataset.file)
+        playBoink()
+        card.classList.add('boinking')
+        setTimeout(() => {
+          bucketData[currentBucket] = (bucketData[currentBucket] || []).filter(i => i.file !== btn.dataset.file)
+          renderCounts()
+          renderItems()
+        }, 280)
+      } catch { /* silently ignore */ }
+    })
+  })
+
   el.querySelectorAll('.done-btn').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation()
@@ -161,9 +190,13 @@ function itemCard(item, meta) {
       </div>
       ${snippet ? `<div class="item-preview">${escHtml(snippet)}</div>` : ''}
       ${tags.length ? `<div class="item-tags">${tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
-      <button class="done-btn" data-file="${escAttr(item.file)}" title="Mark as done">
-        ${circleSVG()}
-      </button>
+      <div class="item-actions">
+        <button class="done-btn" data-file="${escAttr(item.file)}" title="Mark as done">
+          ${circleSVG()}
+        </button>
+        ${currentBucket !== 'today' ? `<button class="to-today-btn" data-file="${escAttr(item.file)}" title="Move to Today">→</button>` : ''}
+        <button class="dismiss-btn" data-file="${escAttr(item.file)}" title="Dismiss">✕</button>
+      </div>
     </div>
   `
 }

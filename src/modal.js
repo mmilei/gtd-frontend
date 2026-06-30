@@ -24,6 +24,7 @@ export function initModal(onSave) {
   overlay.className = 'modal-overlay hidden'
   overlay.innerHTML = `
     <div class="modal-box">
+      <button id="modal-close" class="modal-close-btn" title="Close">×</button>
       <div class="modal-bucket-selector" id="modal-bucket-selector"></div>
       <input type="text" id="modal-item-title" class="modal-title-input" spellcheck="false">
       <textarea id="modal-body" class="modal-textarea" spellcheck="false"></textarea>
@@ -65,6 +66,7 @@ export function initModal(onSave) {
   overlay.addEventListener('click', e => {
     if (e.target === overlay) closeModal()
   })
+  document.getElementById('modal-close').addEventListener('click', closeModal)
   document.getElementById('modal-cancel').addEventListener('click', closeModal)
   document.getElementById('modal-save').addEventListener('click', saveModal)
   document.getElementById('modal-markdownify').addEventListener('click', runMarkdownify)
@@ -342,7 +344,8 @@ async function saveModal() {
 
     if (Object.keys(meta).length > 0) await patchMeta(currentFile, meta)
 
-    closeModal()
+    saveBtn.innerHTML = 'Saved ✓'
+    setTimeout(() => { saveBtn.innerHTML = 'Save <kbd>Ctrl+Enter</kbd>' }, 1000)
     if (onSaveCallback) await onSaveCallback()
   } catch {
     saveBtn.disabled  = false

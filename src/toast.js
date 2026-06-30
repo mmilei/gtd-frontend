@@ -1,5 +1,4 @@
-import { moveItem, dismissItem } from './api.js'
-import { refreshBuckets } from './buckets.js'
+import { openModal } from './modal.js'
 
 const BUCKET_META = {
   today:     { icon: '⚡', color: 'var(--today)' },
@@ -23,42 +22,16 @@ export function initToast() {
     <div class="toast-content">
       <span class="toast-icon"></span>
       <span class="toast-title"></span>
-      <button class="toast-adjust">Adjust ▾</button>
-    </div>
-    <div class="toast-actions hidden">
-      <button data-action="today">⚡ Today</button>
-      <button data-action="backlog">📋 Backlog</button>
-      <button data-action="someday">🌱 Someday</button>
-      <button data-action="dismiss">✕ Dismiss</button>
+      <button class="toast-edit-btn" title="Edit task">✏ Edit</button>
     </div>
     <div class="toast-bar"></div>
   `
   document.body.appendChild(toastEl)
 
-  toastEl.querySelector('.toast-adjust').addEventListener('click', () => {
-    clearTimeout(dismissTimer)
-    toastEl.querySelector('.toast-actions').classList.toggle('hidden')
-    toastEl.querySelector('.toast-bar').style.animationPlayState = 'paused'
-  })
-
-  toastEl.querySelectorAll('.toast-actions [data-action]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!currentFile) return
-      btn.disabled = true
-      try {
-        if (btn.dataset.action === 'dismiss') {
-          await dismissItem(currentFile)
-        } else {
-          await moveItem(currentFile, btn.dataset.action)
-        }
-        hideToast()
-        await refreshBuckets()
-        drainQueue()
-      } catch (err) {
-        console.error('Toast action failed:', err)
-        btn.disabled = false
-      }
-    })
+  toastEl.querySelector('.toast-edit-btn').addEventListener('click', () => {
+    if (!currentFile) return
+    hideToast()
+    openModal(currentFile)
   })
 }
 
