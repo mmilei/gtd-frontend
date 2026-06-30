@@ -390,9 +390,13 @@ async function saveModal() {
 
     if (Object.keys(meta).length > 0) await patchMeta(currentFile, meta)
 
+    // Sync snapshot so isDirty() returns false after save
+    originalItem = { ...originalItem, title: newTitle, body: newBody, bucket: currentBucket, tags: [...currentTags], due: newDue, today_since: newTs, delegado_a: newDel }
+
     saveBtn.disabled = false
     saveBtn.innerHTML = 'Saved ✓'
-    setTimeout(() => { saveBtn.innerHTML = 'Save <kbd>Ctrl+Enter</kbd>' }, 1000)
+    setTimeout(() => { saveBtn.innerHTML = 'Save <kbd>Ctrl+Enter</kbd>'; updateCancelBtn() }, 1000)
+    updateCancelBtn()
     if (onSaveCallback) await onSaveCallback()
   } catch {
     saveBtn.disabled  = false
