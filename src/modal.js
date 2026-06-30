@@ -338,6 +338,7 @@ function hideDiscardConfirm() {
 
 async function saveModal() {
   if (!currentFile) return
+  hideDiscardConfirm()
   const saveBtn  = document.getElementById('modal-save')
   const newBody  = document.getElementById('modal-body').value
   const newTitle = document.getElementById('modal-item-title').value.trim()
