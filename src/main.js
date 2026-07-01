@@ -6,6 +6,7 @@ import { initRefsPanel, refreshIfOpen } from './refs.js'
 import { initReview, openReview } from './review.js'
 import { initTriage, openTriage } from './triage.js'
 import { initToast, showToast } from './toast.js'
+import { initProviderMenu } from './providers.js'
 
 // ─── Init Three.js background ──────────────────────────────
 const canvas = document.getElementById('bg-canvas')
@@ -18,6 +19,7 @@ initRefsPanel()
 initReview(refreshBuckets)
 initTriage()
 initToast()
+initProviderMenu()
 
 document.getElementById('review-btn').addEventListener('click', openReview)
 document.getElementById('triage-btn').addEventListener('click', openTriage)
