@@ -1,5 +1,5 @@
 import { initScene } from './scene.js'
-import { chat, ping, transcribe, replaceBody } from './api.js'
+import { chat, ping, transcribe, replaceBody, dismissItem } from './api.js'
 import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
 import { initModal, openModal } from './modal.js'
 import { initRefsPanel, refreshIfOpen } from './refs.js'
@@ -144,27 +144,28 @@ function appendApiResponse(ops, fallback) {
   wrap.className = 'msg-api'
   wrap.innerHTML = `<div class="api-label">GTD Brain${fallback ? ' <span style="font-size:10px;opacity:0.5">(fallback)</span>' : ''}</div>`
 
-  for (const op of (ops || [])) {
-    wrap.appendChild(buildOpCard(op))
-    showToast(op)
+  if (!ops || ops.length === 0) {
+    const empty = document.createElement('div')
+    empty.className = 'op-card'
+    empty.innerHTML = `<div class="op-content"><div class="op-error">No encontré nada para archivar — ¿podés reformular?</div></div>`
+    wrap.appendChild(empty)
+  } else {
+    for (const op of ops) {
+      wrap.appendChild(buildOpCard(op))
+      showToast(op)
+    }
   }
   messagesEl.appendChild(wrap)
 }
 
-function buildEditConfirmCard(op) {
+function buildConfirmCard(op) {
+  const isDismiss = op.op === 'dismiss'
   const el = document.createElement('div')
   el.className = 'op-card op-card-confirm'
-  el.innerHTML = `
-    <div class="op-confirm-header">
-      <span class="op-icon" style="background:rgba(234,179,8,0.15)">✏️</span>
-      <div class="op-content">
-        <div class="op-top">
-          <span class="op-type">edit</span>
-          <span style="font-size:11px;color:var(--waiting)">awaiting confirmation</span>
-        </div>
-        <div class="op-file">📄 ${escHtml(op.title || op.target_file)}</div>
-      </div>
-    </div>
+
+  const bodyHtml = isDismiss
+    ? `<div class="op-confirm-warning">Descartar "${escHtml(op.title || op.target_file)}"? No se puede deshacer desde el chat.</div>`
+    : `
     <div class="op-diff">
       <div class="op-diff-block op-diff-current">
         <div class="op-diff-label">Current</div>
@@ -174,33 +175,67 @@ function buildEditConfirmCard(op) {
         <div class="op-diff-label">Proposed</div>
         <pre class="op-diff-body">${escHtml(op.proposed_body || '(empty)')}</pre>
       </div>
+    </div>`
+
+  el.innerHTML = `
+    <div class="op-confirm-header">
+      <span class="op-icon" style="background:${isDismiss ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)'}">${isDismiss ? '🗑️' : '✏️'}</span>
+      <div class="op-content">
+        <div class="op-top">
+          <span class="op-type">${isDismiss ? 'dismiss' : 'edit'}</span>
+          <span style="font-size:11px;color:var(--waiting)">awaiting confirmation</span>
+        </div>
+        <div class="op-file">📄 ${escHtml(op.title || op.target_file)}</div>
+      </div>
     </div>
+    ${bodyHtml}
     <div class="op-confirm-actions">
       <button class="confirm-btn">✓ Confirm</button>
       <button class="cancel-btn">✕ Cancel</button>
     </div>
   `
-  el.querySelector('.confirm-btn').addEventListener('click', async () => {
-    const btn = el.querySelector('.confirm-btn')
-    btn.disabled = true
-    btn.textContent = 'Applying…'
+  let resolved = false
+  const confirmBtn = el.querySelector('.confirm-btn')
+  const cancelBtn = el.querySelector('.cancel-btn')
+
+  function resolveCard(html) {
+    el.className = 'op-card'
+    el.style.opacity = '0.6'
+    el.innerHTML = html
+  }
+
+  confirmBtn.addEventListener('click', async () => {
+    if (resolved) return
+    confirmBtn.disabled = true
+    cancelBtn.disabled = true
+    confirmBtn.textContent = 'Aplicando…'
     try {
-      await replaceBody(op.target_file, op.proposed_body)
-      el.innerHTML = `<div class="op-card" style="opacity:0.6">✓ Edit applied — ${escHtml(op.title || op.target_file)}</div>`
+      if (isDismiss) {
+        await dismissItem(op.target_file)
+        resolved = true
+        resolveCard(`✓ Descartada — ${escHtml(op.title || op.target_file)}`)
+      } else {
+        await replaceBody(op.target_file, op.proposed_body)
+        resolved = true
+        resolveCard(`✓ Cambios aplicados — ${escHtml(op.title || op.target_file)}`)
+      }
       await refreshBuckets()
     } catch {
-      btn.disabled = false
-      btn.textContent = '✓ Confirm'
+      confirmBtn.disabled = false
+      cancelBtn.disabled = false
+      confirmBtn.textContent = '✓ Confirm'
     }
   })
-  el.querySelector('.cancel-btn').addEventListener('click', () => {
-    el.remove()
+  cancelBtn.addEventListener('click', () => {
+    if (resolved) return
+    resolved = true
+    resolveCard('✕ Cancelado — sin cambios')
   })
   return el
 }
 
 function buildOpCard(op) {
-  if (op.requires_confirmation) return buildEditConfirmCard(op)
+  if (op.requires_confirmation) return buildConfirmCard(op)
 
   const el = document.createElement('div')
   el.className = 'op-card'

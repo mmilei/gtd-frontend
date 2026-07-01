@@ -717,6 +717,14 @@ html, body {
 }
 .op-diff-current .op-diff-body  { border-color: rgba(239,68,68,0.25); }
 .op-diff-proposed .op-diff-body { border-color: rgba(16,185,129,0.25); }
+.op-confirm-warning {
+  font-size: 12px;
+  color: var(--discard);
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
 .op-confirm-actions {
   display: flex;
   gap: 8px;
