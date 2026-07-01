@@ -72,7 +72,14 @@ export function initModal(onSave) {
     if (e.target === overlay) tryClose()
   })
   document.getElementById('modal-cancel').addEventListener('click', tryClose)
-  document.getElementById('modal-discard-yes').addEventListener('click', () => closeModal())
+  document.getElementById('modal-discard-yes').addEventListener('click', () => {
+    if (originalItem) {
+      populateFields(originalItem, currentFile)
+      hideDiscardConfirm()
+    } else {
+      closeModal()
+    }
+  })
   document.getElementById('modal-discard-no').addEventListener('click', hideDiscardConfirm)
 
   document.querySelector('.modal-box').addEventListener('input', updateCancelBtn)
@@ -146,26 +153,8 @@ export function openModal(filename) {
 
   fetchItem(filename)
     .then(item => {
-      originalItem  = item
-      currentTags   = Array.isArray(item.tags) ? [...item.tags] : []
-      currentBucket = item.bucket || null
-
-      titleEl.value = item.title || item.file || filename
-      bodyEl.value  = item.body  || ''
-      dueEl.value   = item.due   || ''
-      tsEl.value    = item.today_since || ''
-      if (delEl)  delEl.value  = item.delegado_a || ''
-      if (areaEl) areaEl.value = item.area || ''
-
-      renderBucketSelector()
-      renderTagPills()
-      updateConditionalFields(currentBucket)
-      updateCancelBtn()
-
-      const mdBtn = document.getElementById('modal-markdownify')
-      mdBtn.disabled = !!item.markdownified
-      mdBtn.title    = item.markdownified ? 'Already improved with AI' : 'Enrich with AI'
-
+      originalItem = item
+      populateFields(item, filename)
       saveBtn.disabled = false
       titleEl.focus()
       titleEl.select()
@@ -175,6 +164,34 @@ export function openModal(filename) {
       saveBtn.disabled = false
       titleEl.focus()
     })
+}
+
+function populateFields(item, filename) {
+  const titleEl = document.getElementById('modal-item-title')
+  const bodyEl  = document.getElementById('modal-body')
+  const dueEl   = document.getElementById('modal-due')
+  const tsEl    = document.getElementById('modal-today-since')
+  const delEl   = document.getElementById('modal-delegado')
+  const areaEl  = document.getElementById('modal-area')
+
+  currentTags   = Array.isArray(item.tags) ? [...item.tags] : []
+  currentBucket = item.bucket || null
+
+  titleEl.value = item.title || item.file || filename
+  bodyEl.value  = item.body  || ''
+  dueEl.value   = item.due   || ''
+  tsEl.value    = item.today_since || ''
+  if (delEl)  delEl.value  = item.delegado_a || ''
+  if (areaEl) areaEl.value = item.area || ''
+
+  renderBucketSelector()
+  renderTagPills()
+  updateConditionalFields(currentBucket)
+  updateCancelBtn()
+
+  const mdBtn = document.getElementById('modal-markdownify')
+  mdBtn.disabled = !!item.markdownified
+  mdBtn.title    = item.markdownified ? 'Already improved with AI' : 'Enrich with AI'
 }
 
 export function closeModal() {
