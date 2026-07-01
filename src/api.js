@@ -111,3 +111,19 @@ export async function ping() {
     return false
   }
 }
+
+export async function getProviders() {
+  const res = await fetch(`${BASE}/providers`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() // { active, providers: [{ id, label, status }] }
+}
+
+export async function selectProvider(id) {
+  const res = await fetch(`${BASE}/providers/select`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: id }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
