@@ -14,6 +14,7 @@ let onSaveCallback = null
 let currentFile    = null
 let originalItem   = null
 let currentTags    = []
+let currentPeople  = []
 let currentBucket  = null
 
 export function initModal(onSave) {
@@ -42,9 +43,9 @@ export function initModal(onSave) {
             <input type="date" id="modal-today-since" class="modal-date-input">
           </div>
         </div>
-        <div class="modal-field" id="modal-delegado-field" style="display:none">
-          <label class="modal-field-label">Delegated to</label>
-          <input type="text" id="modal-delegado" class="modal-date-input" placeholder="Name or team">
+        <div class="modal-field">
+          <label class="modal-field-label">Related people</label>
+          <div class="modal-tags-editor" id="modal-people-editor"></div>
         </div>
         <div class="modal-field modal-field-conditional" id="modal-area-field">
           <label class="modal-field-label">Area</label>
@@ -127,6 +128,7 @@ export function openModal(filename) {
   currentFile   = filename
   originalItem  = null
   currentTags   = []
+  currentPeople = []
   currentBucket = null
 
   const titleEl = document.getElementById('modal-item-title')
@@ -134,19 +136,18 @@ export function openModal(filename) {
   const saveBtn = document.getElementById('modal-save')
   const dueEl   = document.getElementById('modal-due')
   const tsEl    = document.getElementById('modal-today-since')
-  const delEl   = document.getElementById('modal-delegado')
   const areaEl  = document.getElementById('modal-area')
 
   titleEl.value = '…'
   bodyEl.value  = ''
   dueEl.value   = ''
   tsEl.value    = ''
-  if (delEl)  delEl.value  = ''
   if (areaEl) areaEl.value = ''
   saveBtn.innerHTML = 'Save <kbd>Ctrl+Enter</kbd>'
   saveBtn.disabled  = true
   renderBucketSelector()
   renderTagPills()
+  renderPeoplePills()
   updateConditionalFields(null)
 
   document.getElementById('edit-modal').classList.remove('hidden')
@@ -171,21 +172,21 @@ function populateFields(item, filename) {
   const bodyEl  = document.getElementById('modal-body')
   const dueEl   = document.getElementById('modal-due')
   const tsEl    = document.getElementById('modal-today-since')
-  const delEl   = document.getElementById('modal-delegado')
   const areaEl  = document.getElementById('modal-area')
 
   currentTags   = Array.isArray(item.tags) ? [...item.tags] : []
+  currentPeople = Array.isArray(item.delegado_a) ? [...item.delegado_a] : []
   currentBucket = item.bucket || null
 
   titleEl.value = item.title || item.file || filename
   bodyEl.value  = item.body  || ''
   dueEl.value   = item.due   || ''
   tsEl.value    = item.today_since || ''
-  if (delEl)  delEl.value  = item.delegado_a || ''
   if (areaEl) areaEl.value = item.area || ''
 
   renderBucketSelector()
   renderTagPills()
+  renderPeoplePills()
   updateConditionalFields(currentBucket)
   updateCancelBtn()
 
@@ -200,6 +201,7 @@ export function closeModal() {
   currentFile   = null
   originalItem  = null
   currentTags   = []
+  currentPeople = []
   currentBucket = null
 }
 
@@ -232,7 +234,6 @@ function renderBucketSelector() {
 
 function updateConditionalFields(bucket) {
   const tsField  = document.getElementById('modal-today-since-field')
-  const delField = document.getElementById('modal-delegado-field')
   const mdBtn    = document.getElementById('modal-markdownify')
   const box      = document.querySelector('.modal-box')
 
@@ -241,10 +242,6 @@ function updateConditionalFields(bucket) {
   if (tsField) {
     tsField.classList.toggle('modal-field-conditional', true)
     tsField.classList.toggle('visible', bucket === 'today')
-  }
-  if (delField) {
-    delField.classList.toggle('modal-field-conditional', true)
-    delField.classList.toggle('visible', bucket === 'waiting')
   }
   const areaField = document.getElementById('modal-area-field')
   if (areaField) areaField.classList.toggle('visible', bucket === 'reference')
@@ -313,6 +310,66 @@ function removeTag(tag) {
   document.getElementById('modal-tag-input')?.focus()
 }
 
+function renderPeoplePills() {
+  const container = document.getElementById('modal-people-editor')
+  if (!container) return
+
+  const pills = currentPeople.map(p => `
+    <span class="modal-tag-pill">
+      ${escHtml(p)}
+      <button class="tag-remove-btn" data-person="${escAttr(p)}" title="Remove person">×</button>
+    </span>
+  `).join('')
+
+  container.innerHTML = pills + `
+    <input type="text" id="modal-people-input" class="modal-tag-input" placeholder="+ person">
+  `
+
+  container.querySelectorAll('.tag-remove-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      removePerson(btn.dataset.person)
+    })
+  })
+
+  const peopleInput = document.getElementById('modal-people-input')
+  peopleInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      const val = peopleInput.value.trim().replace(/,/g, '')
+      if (val) addPerson(val)
+    }
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      peopleInput.value = ''
+    }
+    if (e.key === 'Backspace' && peopleInput.value === '' && currentPeople.length > 0) {
+      removePerson(currentPeople[currentPeople.length - 1])
+    }
+  })
+  peopleInput.addEventListener('blur', () => {
+    const val = peopleInput.value.trim()
+    if (val) addPerson(val)
+  })
+}
+
+function addPerson(name) {
+  const clean = name.trim()
+  if (clean && !currentPeople.includes(clean)) {
+    currentPeople.push(clean)
+    renderPeoplePills()
+    updateCancelBtn()
+    document.getElementById('modal-people-input')?.focus()
+  }
+}
+
+function removePerson(name) {
+  currentPeople = currentPeople.filter(p => p !== name)
+  renderPeoplePills()
+  updateCancelBtn()
+  document.getElementById('modal-people-input')?.focus()
+}
+
 async function runMarkdownify() {
   if (!currentFile) return
   const mdBtn  = document.getElementById('modal-markdownify')
@@ -345,6 +402,7 @@ function isDirty() {
     body !== (originalItem.body || '') ||
     currentBucket !== (originalItem.bucket || null) ||
     JSON.stringify([...currentTags].sort()) !== JSON.stringify([...(originalItem.tags || [])].sort()) ||
+    JSON.stringify([...currentPeople].sort()) !== JSON.stringify([...(originalItem.delegado_a || [])].sort()) ||
     due !== (originalItem.due || null)
 }
 
@@ -377,7 +435,6 @@ async function saveModal() {
   const newTitle = document.getElementById('modal-item-title').value.trim()
   const newDue   = document.getElementById('modal-due').value || null
   const newTs    = document.getElementById('modal-today-since').value || null
-  const newDel   = document.getElementById('modal-delegado')?.value.trim() || null
 
   saveBtn.disabled    = true
   saveBtn.textContent = 'Saving…'
@@ -415,9 +472,9 @@ async function saveModal() {
       meta.today_since = newTs
     }
 
-    if (currentBucket === 'waiting' && newDel !== (orig.delegado_a || null)) {
-      meta.delegado_a = newDel
-    }
+    const sortedPeople     = [...currentPeople].sort()
+    const sortedOrigPeople = [...(orig.delegado_a || [])].sort()
+    if (JSON.stringify(sortedPeople) !== JSON.stringify(sortedOrigPeople)) meta.delegado_a = currentPeople
 
     const areaVal = document.getElementById('modal-area')?.value.trim() || null
     if (areaVal !== (orig.area || null)) meta.area = areaVal
@@ -425,7 +482,7 @@ async function saveModal() {
     if (Object.keys(meta).length > 0) await patchMeta(currentFile, meta)
 
     // Sync snapshot so isDirty() returns false after save
-    originalItem = { ...originalItem, title: newTitle, body: newBody, bucket: currentBucket, tags: [...currentTags], due: newDue, today_since: newTs, delegado_a: newDel }
+    originalItem = { ...originalItem, title: newTitle, body: newBody, bucket: currentBucket, tags: [...currentTags], due: newDue, today_since: newTs, delegado_a: [...currentPeople] }
 
     saveBtn.disabled = false
     saveBtn.innerHTML = 'Saved ✓'

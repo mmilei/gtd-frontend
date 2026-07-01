@@ -11,7 +11,7 @@ const BUCKET_META = {
 
 let currentBucket = 'today'
 let bucketData    = {}
-let selectedTag   = null
+let selectedTags  = new Set()
 
 export function initSidebar() {
   const tabs = document.querySelectorAll('.tab-btn')
@@ -20,7 +20,7 @@ export function initSidebar() {
       tabs.forEach(t => t.classList.remove('active'))
       btn.classList.add('active')
       currentBucket = btn.dataset.bucket
-      selectedTag   = null
+      selectedTags  = new Set()
       renderTagBar()
       renderItems()
     })
@@ -55,14 +55,19 @@ function renderTagBar() {
   if (tags.length === 0) { el.innerHTML = ''; return }
 
   el.innerHTML = tags.map(([tag, count]) => `
-    <button class="tag-filter-pill${selectedTag === tag ? ' active' : ''}" data-tag="${escAttr(tag)}">
+    <button class="tag-filter-pill${selectedTags.has(tag) ? ' active' : ''}" data-tag="${escAttr(tag)}">
       ${escHtml(tag)} <span class="tpill-count">${count}</span>
     </button>
   `).join('')
 
   el.querySelectorAll('.tag-filter-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      selectedTag = selectedTag === pill.dataset.tag ? null : pill.dataset.tag
+    pill.addEventListener('click', e => {
+      const tag = pill.dataset.tag
+      if (e.shiftKey) {
+        selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag)
+      } else {
+        selectedTags = (selectedTags.size === 1 && selectedTags.has(tag)) ? new Set() : new Set([tag])
+      }
       renderTagBar()
       renderItems()
     })
@@ -86,7 +91,7 @@ function renderCounts() {
         t.classList.toggle('active', t.dataset.bucket === chip.dataset.bucket)
       })
       currentBucket = chip.dataset.bucket
-      selectedTag = null
+      selectedTags  = new Set()
       renderTagBar()
       renderItems()
     })
@@ -97,12 +102,13 @@ function renderItems() {
   const el  = document.getElementById('items-list')
   const all = bucketData[currentBucket] || []
 
-  const items = selectedTag
-    ? all.filter(i => Array.isArray(i.tags) && i.tags.includes(selectedTag))
+  const items = selectedTags.size > 0
+    ? all.filter(i => Array.isArray(i.tags) && [...selectedTags].every(t => i.tags.includes(t)))
     : all
 
   if (items.length === 0) {
-    el.innerHTML = `<div class="empty-state"><p>${selectedTag ? `No items with #${escHtml(selectedTag)}` : 'No items'}</p></div>`
+    const label = selectedTags.size > 0 ? `No items with #${[...selectedTags].map(escHtml).join(' #')}` : 'No items'
+    el.innerHTML = `<div class="empty-state"><p>${label}</p></div>`
     return
   }
 
@@ -175,7 +181,9 @@ function renderItems() {
 function itemCard(item, meta) {
   const color    = meta.color || 'var(--muted)'
   const due      = item.due ? `· ${item.due}` : ''
-  const delegado = item.delegado_a ? `· @${item.delegado_a}` : ''
+  const delegado = Array.isArray(item.delegado_a) && item.delegado_a.length
+    ? `· ${item.delegado_a.map(p => `@${p}`).join(' ')}`
+    : ''
   const SYSTEM   = new Set(['gtd', 'action', 'reference', 'project'])
   const tags     = Array.isArray(item.tags) ? item.tags.filter(t => !SYSTEM.has(t)) : []
   const snippet  = bodySnippet(item.body)
