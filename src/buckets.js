@@ -86,6 +86,8 @@ function renderCounts() {
         t.classList.toggle('active', t.dataset.bucket === chip.dataset.bucket)
       })
       currentBucket = chip.dataset.bucket
+      selectedTag = null
+      renderTagBar()
       renderItems()
     })
   })

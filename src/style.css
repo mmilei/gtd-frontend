@@ -613,6 +613,89 @@ html, body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+.op-card-clickable {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.op-card-clickable:hover {
+  border-color: rgba(99,102,241,0.4);
+  background: rgba(99,102,241,0.06);
+}
+
+/* ─── Edit confirmation card ─────────────────────────────── */
+.op-card-confirm {
+  flex-direction: column;
+  gap: 10px;
+}
+.op-confirm-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.op-diff {
+  display: flex;
+  gap: 8px;
+}
+.op-diff-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.op-diff-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.op-diff-body {
+  font-family: 'Fira Mono', 'Consolas', monospace;
+  font-size: 11px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 0;
+  overflow: auto;
+  max-height: 110px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+.op-diff-current .op-diff-body  { border-color: rgba(239,68,68,0.25); }
+.op-diff-proposed .op-diff-body { border-color: rgba(16,185,129,0.25); }
+.op-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.confirm-btn {
+  background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.3);
+  color: #10b981;
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.confirm-btn:hover:not(:disabled) { background: rgba(16,185,129,0.22); }
+.confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.cancel-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cancel-btn:hover { background: rgba(255,255,255,0.05); }
+
 .op-icon {
   width: 32px;
   height: 32px;
@@ -1120,6 +1203,21 @@ html, body {
 }
 .modal-done-btn:hover:not(:disabled) { background: rgba(16,185,129,0.22); }
 .modal-done-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ─── Discard task button ────────────────────────────────── */
+.modal-dismiss-btn {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.25);
+  color: #f87171;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.modal-dismiss-btn:hover:not(:disabled) { background: rgba(239,68,68,0.2); }
+.modal-dismiss-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── Markdownify button ─────────────────────────────────── */
 .modal-markdownify-btn {
