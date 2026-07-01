@@ -181,3 +181,21 @@ export async function dismissItem(filename) {
 export async function ping() {
   return true
 }
+
+const PROVIDERS = [
+  { id: 'groq', label: 'Groq (Llama 3.3-70b)', status: 'UP' },
+  { id: 'ollama', label: 'Ollama (local)', status: 'DOWN' },
+]
+
+let activeProvider = 'groq'
+
+export async function getProviders() {
+  return { active: activeProvider, providers: PROVIDERS }
+}
+
+export async function selectProvider(id) {
+  const found = PROVIDERS.find(p => p.id === id)
+  if (!found || found.status !== 'UP') throw new Error(`Provider ${id} unavailable`)
+  activeProvider = id
+  return { active: activeProvider }
+}
