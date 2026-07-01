@@ -1,4 +1,4 @@
-import { fetchItem, replaceBody, patchMeta, markdownifyItem, moveItem, markDone } from './api.js'
+import { fetchItem, replaceBody, patchMeta, markdownifyItem, moveItem, markDone, dismissItem } from './api.js'
 
 const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
 
@@ -59,6 +59,7 @@ export function initModal(onSave) {
       </div>
       <div class="modal-actions">
         <button id="modal-done" class="modal-done-btn">✓ Done</button>
+        <button id="modal-dismiss" class="modal-dismiss-btn">🗑 Discard</button>
         <button id="modal-cancel">Cancel</button>
         <button id="modal-markdownify" class="modal-markdownify-btn" title="Enrich with AI">✨ Improve</button>
         <button id="modal-save">Save <kbd>Ctrl+Enter</kbd></button>
@@ -90,6 +91,21 @@ export function initModal(onSave) {
     } catch {
       btn.disabled = false
       btn.textContent = '✓ Done'
+    }
+  })
+
+  document.getElementById('modal-dismiss').addEventListener('click', async () => {
+    if (!currentFile) return
+    const btn = document.getElementById('modal-dismiss')
+    btn.disabled = true
+    btn.textContent = '🗑 Discarding…'
+    try {
+      await dismissItem(currentFile)
+      closeModal()
+      if (onSaveCallback) await onSaveCallback()
+    } catch {
+      btn.disabled = false
+      btn.textContent = '🗑 Discard'
     }
   })
 

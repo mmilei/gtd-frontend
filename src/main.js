@@ -1,7 +1,7 @@
 import { initScene } from './scene.js'
 import { chat, ping, transcribe, replaceBody } from './api.js'
 import { initSidebar, refreshBuckets, BUCKET_META } from './buckets.js'
-import { initModal } from './modal.js'
+import { initModal, openModal } from './modal.js'
 import { initRefsPanel, refreshIfOpen } from './refs.js'
 import { initReview, openReview } from './review.js'
 import { initTriage, openTriage } from './triage.js'
@@ -202,6 +202,12 @@ function buildOpCard(op) {
 
   const el = document.createElement('div')
   el.className = 'op-card'
+
+  if (op.op === 'create' && op.file && op.filed) {
+    el.dataset.file = op.file
+    el.classList.add('op-card-clickable')
+    el.addEventListener('click', () => openModal(op.file))
+  }
 
   const bucket = op.bucket || ''
   const meta   = BUCKET_META[bucket] || {}
