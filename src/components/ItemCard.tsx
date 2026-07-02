@@ -1,6 +1,7 @@
-import { Check, X } from 'lucide-react'
+import { Check, Play, X } from 'lucide-react'
 import { useState } from 'react'
 import { playBoink } from '../lib/sound'
+import { formatMinutes } from '../lib/todayOrder'
 import { SYSTEM_TAGS } from '../lib/types'
 import type { Bucket, Item } from '../lib/types'
 
@@ -10,6 +11,8 @@ interface Props {
   onOpen: (file: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
+  /** Present only in Today — starts a focus session on this item. */
+  onFocus?: (item: Item) => void
 }
 
 function bodySnippet(body?: string): string {
@@ -26,7 +29,7 @@ function daysInToday(item: Item, bucket: Bucket): number {
   return Math.floor((Date.now() - new Date(item.today_since).getTime()) / 86_400_000)
 }
 
-export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss }: Props) {
+export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onFocus }: Props) {
   const [leaving, setLeaving] = useState(false)
 
   async function run(e: React.MouseEvent, action: (i: Item) => Promise<boolean>, sound = false) {
@@ -65,6 +68,7 @@ export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss }: Props)
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] text-ink-faint">
             {item.created && <span>{item.created}</span>}
             {item.due && <span className="text-waiting">due {item.due}</span>}
+            {item.estimate_minutes != null && <span className="text-today">~{formatMinutes(item.estimate_minutes)}</span>}
             {people.length > 0 && <span>{people.map(p => `@${p}`).join(' ')}</span>}
             {age >= 2 && <span className="text-ink-muted">{age}d in today</span>}
           </div>
@@ -81,6 +85,19 @@ export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss }: Props)
         </div>
 
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          {onFocus && (
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                onFocus(item)
+              }}
+              title="Focus on this task"
+              aria-label={`Focus on "${title}"`}
+              className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-raised hover:text-accent"
+            >
+              <Play size={14} />
+            </button>
+          )}
           <button
             onClick={e => run(e, onDismiss, true)}
             title="Dismiss"

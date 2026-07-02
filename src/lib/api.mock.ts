@@ -16,8 +16,8 @@ function makeFilename(title: string): string {
 
 const state: Record<Bucket, Item[]> = {
   today: [
-    { file: '20260628-090000-review-team-pull-request.md', bucket: 'today', title: 'Review team pull request', due: todayStr(), tags: ['work', 'code'], body: '', created: '2026-06-28', today_since: '2026-06-28' },
-    { file: '20260628-095500-call-the-dentist.md', bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['health'], body: '', created: '2026-06-28', today_since: '2026-06-28' },
+    { file: '20260628-090000-review-team-pull-request.md', bucket: 'today', title: 'Review team pull request', due: todayStr(), tags: ['work', 'code'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 45 },
+    { file: '20260628-095500-call-the-dentist.md', bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['health'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 10 },
   ],
   backlog: [
     { file: '20260627-150000-write-project-readme.md', bucket: 'backlog', title: 'Write project README', tags: ['work'], body: '', created: '2026-06-27' },

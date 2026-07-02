@@ -1,6 +1,7 @@
-import { Search } from 'lucide-react'
+import { Play, Search } from 'lucide-react'
 import { useState } from 'react'
 import { BUCKET_META } from '../lib/bucketMeta'
+import { formatMinutes, projectDay } from '../lib/todayOrder'
 import type { Bucket, Item } from '../lib/types'
 import { ItemCard } from './ItemCard'
 import { TagBar } from './TagBar'
@@ -14,11 +15,14 @@ interface Props {
   onOpenItem: (file: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
+  /** Present only for Today — starts a focus session (optionally from a given item). */
+  onFocus?: (item?: Item) => void
 }
 
-export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onOpenItem, onComplete, onDismiss }: Props) {
+export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onOpenItem, onComplete, onDismiss, onFocus }: Props) {
   const meta = BUCKET_META[bucket]
   const [query, setQuery] = useState('')
+  const projection = bucket === 'today' ? projectDay(items) : null
 
   // Reference doubles as the knowledge shelf — it gets a text search on top of tag filters.
   const q = bucket === 'reference' ? query.trim().toLowerCase() : ''
@@ -36,6 +40,15 @@ export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, o
           <span className="font-mono text-[13px] tabular-nums text-ink-faint">
             {String(visible.length).padStart(2, '0')}
           </span>
+          {onFocus && visible.length > 0 && (
+            <button
+              onClick={() => onFocus()}
+              className="ml-auto flex items-center gap-1.5 rounded-md border border-accent/40 px-3 py-1 text-[12px] text-accent transition-colors hover:bg-accent-soft"
+            >
+              <Play size={12} />
+              Focus
+            </button>
+          )}
           {bucket === 'reference' && (
             <div className="ml-auto flex items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 py-1">
               <Search size={12} className="text-ink-faint" />
@@ -49,6 +62,16 @@ export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, o
             </div>
           )}
         </div>
+
+        {projection && (
+          <div className="mb-3 font-mono text-[11.5px] text-ink-muted">
+            {formatMinutes(projection.totalMinutes)} of estimated work · finishes ~
+            <span className="text-today">{projection.finishLabel}</span>
+            {projection.unestimatedCount > 0 && (
+              <span className="text-ink-faint"> · {projection.unestimatedCount} without estimate</span>
+            )}
+          </div>
+        )}
 
         <TagBar items={allItems} selected={selectedTags} onToggle={onToggleTag} />
 
@@ -72,6 +95,7 @@ export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, o
                 onOpen={onOpenItem}
                 onComplete={onComplete}
                 onDismiss={onDismiss}
+                onFocus={onFocus}
               />
             ))}
           </div>

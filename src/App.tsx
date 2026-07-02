@@ -9,7 +9,11 @@ import type { FeedEntry } from './components/OpsFeed'
 import { ReviewOverlay } from './components/ReviewOverlay'
 import { TriageOverlay } from './components/TriageOverlay'
 import { UndoToast, useUndoToast } from './components/UndoToast'
+import { AmbientScene } from './components/AmbientScene'
+import { FocusOverlay } from './components/FocusOverlay'
 import { chat, dismissItem, replaceBody } from './lib/api'
+import { celebrate } from './lib/celebration'
+import { orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
 import type { Bucket, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
@@ -28,6 +32,7 @@ export default function App() {
   const [editingFile, setEditingFile] = useState<string | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [focusSession, setFocusSession] = useState<{ queue: Item[]; startIndex: number } | null>(null)
 
   const { toast, show: showUndo, dismiss: dismissToast, runUndo } = useUndoToast(refresh)
 
@@ -50,10 +55,22 @@ export default function App() {
 
   const bucketItems = buckets[bucket] ?? []
   const visibleItems = useMemo(() => {
-    if (selectedTags.size === 0) return bucketItems
-    const wanted = [...selectedTags]
-    return bucketItems.filter(i => wanted.every(t => (i.tags ?? []).includes(t)))
-  }, [bucketItems, selectedTags])
+    const filtered =
+      selectedTags.size === 0
+        ? bucketItems
+        : bucketItems.filter(i => [...selectedTags].every(t => (i.tags ?? []).includes(t)))
+    return bucket === 'today' ? orderToday(filtered) : filtered
+  }, [bucket, bucketItems, selectedTags])
+
+  const startFocus = useCallback(
+    (item?: Item) => {
+      const queue = orderToday(buckets.today ?? [])
+      if (queue.length === 0) return
+      const startIndex = item ? Math.max(0, queue.findIndex(i => i.file === item.file)) : 0
+      setFocusSession({ queue, startIndex })
+    },
+    [buckets.today],
+  )
 
   const tagSuggestions = useMemo(() => {
     const all = new Set<string>()
@@ -126,11 +143,20 @@ export default function App() {
     [showUndo],
   )
 
-  const complete = useMemo(() => withUndo(completeItem, 'Done'), [withUndo, completeItem])
+  const complete = useMemo(() => {
+    const withToast = withUndo(completeItem, 'Done')
+    return async (item: Item) => {
+      const ok = await withToast(item)
+      if (ok) celebrate()
+      return ok
+    }
+  }, [withUndo, completeItem])
   const remove = useMemo(() => withUndo(removeItem, 'Dismissed'), [withUndo, removeItem])
 
   return (
-    <div className="flex h-full flex-col">
+    <>
+    <AmbientScene />
+    <div className="relative z-10 flex h-full flex-col">
       {IS_MOCK && (
         <div className="shrink-0 bg-accent-soft px-5 py-1 text-center text-[11px] text-accent">
           Demo mode — data is fictional and resets on reload
@@ -149,6 +175,7 @@ export default function App() {
             onOpenItem={setEditingFile}
             onComplete={complete}
             onDismiss={remove}
+            onFocus={bucket === 'today' ? startFocus : undefined}
           />
           <OpsFeed entries={feed} onOpenItem={setEditingFile} onConfirmOp={confirmOp} onCancelOp={(id, i) => resolveOp(id, i, 'Cancelled — no changes')} />
           <CaptureBar busy={capturing} onSend={sendCapture} onError={captureError} />
@@ -165,8 +192,17 @@ export default function App() {
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
       {reviewOpen && <ReviewOverlay onClose={() => setReviewOpen(false)} onChanged={() => void refresh()} />}
+      {focusSession && (
+        <FocusOverlay
+          queue={focusSession.queue}
+          startIndex={focusSession.startIndex}
+          onClose={() => setFocusSession(null)}
+          onChanged={() => void refresh()}
+        />
+      )}
 
       <UndoToast toast={toast} onUndo={runUndo} onDismiss={dismissToast} />
     </div>
+    </>
   )
 }

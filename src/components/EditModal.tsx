@@ -29,6 +29,7 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
   const [due, setDue] = useState('')
   const [todaySince, setTodaySince] = useState('')
   const [area, setArea] = useState('')
+  const [estimate, setEstimate] = useState('')
 
   const [saving, setSaving] = useState(false)
   const [saveLabel, setSaveLabel] = useState('Save')
@@ -49,6 +50,7 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
         setDue(item.due ?? '')
         setTodaySince(item.today_since ?? '')
         setArea(item.area ?? '')
+        setEstimate(item.estimate_minutes != null ? String(item.estimate_minutes) : '')
       })
       .catch(() => !cancelled && setLoadFailed(true))
     return () => {
@@ -70,9 +72,10 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
       !same(people, original.delegado_a ?? []) ||
       (due || null) !== (original.due ?? null) ||
       (todaySince || null) !== (original.today_since ?? null) ||
-      (area || null) !== (original.area ?? null)
+      (area || null) !== (original.area ?? null) ||
+      (estimate ? Number(estimate) : null) !== (original.estimate_minutes ?? null)
     )
-  }, [original, title, body, bucket, tags, people, due, todaySince, area])
+  }, [original, title, body, bucket, tags, people, due, todaySince, area, estimate])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -102,6 +105,8 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
       }
       if (JSON.stringify([...people].sort()) !== JSON.stringify([...(original.delegado_a ?? [])].sort())) meta.delegado_a = people
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
+      const estimateNum = estimate ? Math.max(1, Math.round(Number(estimate))) : null
+      if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
       setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags: nextTags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null })
@@ -191,6 +196,20 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
               className="rounded-card border border-line bg-bg px-3 py-1.5 font-mono text-[12px] text-ink focus:border-accent/60 focus:outline-none [color-scheme:dark]"
             />
           </label>
+          {bucket !== 'reference' && (
+            <label className="flex flex-col gap-1.5">
+              <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Estimate (min)</span>
+              <input
+                type="number"
+                min={1}
+                step={5}
+                value={estimate}
+                onChange={e => setEstimate(e.target.value)}
+                placeholder="e.g. 30"
+                className="rounded-card border border-line bg-bg px-3 py-1.5 font-mono text-[12px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
+              />
+            </label>
+          )}
           {bucket === 'today' && (
             <label className="flex flex-col gap-1.5">
               <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">In today since</span>

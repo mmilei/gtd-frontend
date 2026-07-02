@@ -1,6 +1,6 @@
 {
   "name": "gtd-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,6 +19,7 @@
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.185.0",
     "@vitejs/plugin-react": "^4.7.0",
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",

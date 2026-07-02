@@ -12,6 +12,7 @@ export interface Item {
   delegado_a?: string[]
   area?: string | null
   markdownified?: boolean
+  estimate_minutes?: number | null
 }
 
 export type BucketsMap = Record<Bucket, Item[]>
