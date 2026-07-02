@@ -36,6 +36,7 @@ export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }:
     if (!ok) setLeaving(false)
   }
 
+  const title = item.title ?? item.file
   const tags = (item.tags ?? []).filter(t => !SYSTEM_TAGS.has(t))
   const snippet = bodySnippet(item.body)
   const age = daysInToday(item, bucket)
@@ -51,14 +52,14 @@ export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }:
         <button
           onClick={() => run(onComplete, true)}
           title="Mark as done"
-          aria-label={`Mark "${item.title ?? item.file}" as done`}
+          aria-label={`Mark "${title}" as done`}
           className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-line-strong text-transparent transition-colors hover:border-done hover:text-done"
         >
           <Check size={11} strokeWidth={2.5} />
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13.5px] leading-snug text-ink">{item.title ?? item.file}</div>
+          <div className="truncate text-[13.5px] leading-snug text-ink">{title}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] text-ink-faint">
             {item.created && <span>{item.created}</span>}
             {item.due && <span className="text-waiting">due {item.due}</span>}
@@ -82,7 +83,7 @@ export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }:
             <button
               onClick={() => run(onSendToToday)}
               title="Move to Today"
-              aria-label={`Move "${item.title ?? item.file}" to Today`}
+              aria-label={`Move "${title}" to Today`}
               className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-raised hover:text-today"
             >
               <ArrowRight size={14} />
@@ -91,7 +92,7 @@ export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }:
           <button
             onClick={() => run(onDismiss, true)}
             title="Dismiss"
-            aria-label={`Dismiss "${item.title ?? item.file}"`}
+            aria-label={`Dismiss "${title}"`}
             className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-raised hover:text-discard"
           >
             <X size={14} />

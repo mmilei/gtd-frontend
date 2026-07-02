@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dismissItem, getBuckets, getToday, markDone, moveItem, ping } from '../lib/api'
+import { dismissItem, getBuckets, getToday, markDone, moveItem } from '../lib/api'
 import type { Bucket, BucketsMap, Item } from '../lib/types'
 
 const EMPTY: BucketsMap = { today: [], backlog: [], waiting: [], someday: [], reference: [] }
+
+/** Matches --animate-card-out in app.css so items finish leaving before the state drops them. */
+const EXIT_ANIMATION_MS = 280
 
 export type ApiStatus = 'connecting' | 'online' | 'offline'
 
@@ -27,6 +30,7 @@ export function useBuckets(): BucketsState {
     }
   }, [])
 
+  // /today applies backend-side ordering, so it overrides the today list from /buckets.
   const refresh = useCallback(async () => {
     try {
       const [all, today] = await Promise.all([getBuckets(), getToday()])
@@ -38,30 +42,19 @@ export function useBuckets(): BucketsState {
     }
   }, [])
 
+  // refresh doubles as the health check: it flips apiStatus on every outcome.
   useEffect(() => {
-    let cancelled = false
-    async function healthCheck() {
-      const ok = await ping()
-      if (cancelled) return
-      if (ok) {
-        await refresh()
-      } else {
-        setApiStatus('offline')
-      }
-    }
-    healthCheck()
-    const id = setInterval(healthCheck, 30_000)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
+    void refresh()
+    const id = setInterval(() => void refresh(), 30_000)
+    return () => clearInterval(id)
   }, [refresh])
 
-  /** Optimistically drop the item locally, then re-sync in the background. */
+  /** Run the API action, let the exit animation finish, then drop the item locally and re-sync. */
   const withOptimisticRemove = useCallback(
     async (item: Item, action: () => Promise<unknown>): Promise<boolean> => {
       try {
-        await action()
+        await Promise.all([action(), new Promise(r => setTimeout(r, EXIT_ANIMATION_MS))])
+        if (!alive.current) return true
         setBuckets(prev => {
           const next = { ...prev }
           for (const b of Object.keys(next) as Bucket[]) {

@@ -16,7 +16,6 @@ interface Props {
 
 export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onComplete, onDismiss, onSendToToday }: Props) {
   const meta = BUCKET_META[bucket]
-  const filteredBy = [...selectedTags]
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -34,8 +33,8 @@ export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, o
 
         {items.length === 0 ? (
           <div className="rounded-card border border-dashed border-line px-6 py-12 text-center text-[13px] text-ink-faint">
-            {filteredBy.length > 0
-              ? `Nothing here matches ${filteredBy.map(t => `#${t}`).join(' + ')}`
+            {selectedTags.size > 0
+              ? `Nothing here matches ${[...selectedTags].map(t => `#${t}`).join(' + ')}`
               : bucket === 'today'
                 ? 'Today is clear. Pull something from the backlog when you’re ready.'
                 : 'Nothing here.'}

@@ -8,8 +8,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-const json = (body: unknown): RequestInit => ({
-  method: 'POST',
+const json = (body: unknown, method: 'POST' | 'PUT' = 'POST'): RequestInit => ({
+  method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 })
@@ -47,19 +47,11 @@ export function moveItem(filename: string, bucket: string, due: string | null = 
 }
 
 export function patchMeta(filename: string, meta: Partial<Item>): Promise<Item> {
-  return request(`/items/${encodeURIComponent(filename)}/meta`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(meta),
-  })
+  return request(`/items/${encodeURIComponent(filename)}/meta`, json(meta, 'PUT'))
 }
 
 export function replaceBody(filename: string, body: string): Promise<Item> {
-  return request(`/items/${encodeURIComponent(filename)}/body`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body }),
-  })
+  return request(`/items/${encodeURIComponent(filename)}/body`, json({ body }, 'PUT'))
 }
 
 export function markdownifyItem(filename: string): Promise<{ file: string; body: string; tags: string[] }> {
@@ -75,12 +67,10 @@ export function undo(): Promise<{ undone: boolean }> {
   return request('/undo', { method: 'POST' })
 }
 
-export async function transcribe(audioBlob: Blob): Promise<{ text: string }> {
+export function transcribe(audioBlob: Blob): Promise<{ text: string }> {
   const form = new FormData()
   form.append('audio', audioBlob, 'recording.webm')
-  const res = await fetch(`${BASE}/transcribe`, { method: 'POST', body: form })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return request('/transcribe', { method: 'POST', body: form })
 }
 
 export function getProviders(): Promise<ProvidersResponse> {

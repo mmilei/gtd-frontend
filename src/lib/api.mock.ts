@@ -65,15 +65,12 @@ function findItem(filename: string): { item: Item; bucket: Bucket; idx: number }
   return null
 }
 
-function removeItem(filename: string): boolean {
-  for (const bucket of Object.keys(state) as Bucket[]) {
-    const idx = state[bucket].findIndex(i => i.file === filename)
-    if (idx !== -1) {
-      state[bucket].splice(idx, 1)
-      return true
-    }
-  }
-  return false
+/** Find the item, remove it from its bucket, and return it. Throws if absent. */
+function takeItem(filename: string): Item {
+  const found = findItem(filename)
+  if (!found) throw new Error('Item not found')
+  state[found.bucket].splice(found.idx, 1)
+  return found.item
 }
 
 export async function chat(message: string): Promise<ChatResponse> {
@@ -104,8 +101,8 @@ export async function getBucket(bucket: string): Promise<Item[]> {
   return (state[bucket as Bucket] ?? []).map(i => ({ ...i }))
 }
 
-export async function getToday(): Promise<Item[]> {
-  return state.today.map(i => ({ ...i }))
+export function getToday(): Promise<Item[]> {
+  return getBucket('today')
 }
 
 export async function fetchItem(filename: string): Promise<Item> {
@@ -115,24 +112,15 @@ export async function fetchItem(filename: string): Promise<Item> {
 }
 
 export async function markDone(filename: string): Promise<Item> {
-  const found = findItem(filename)
-  if (!found) throw new Error('Item not found')
-  removeItem(filename)
-  return { ...found.item }
+  return { ...takeItem(filename) }
 }
 
 export async function dismissItem(filename: string): Promise<Item> {
-  const found = findItem(filename)
-  if (!found) throw new Error('Item not found')
-  removeItem(filename)
-  return { ...found.item }
+  return { ...takeItem(filename) }
 }
 
 export async function moveItem(filename: string, bucket: string, due: string | null = null): Promise<Item> {
-  const found = findItem(filename)
-  if (!found) throw new Error('Item not found')
-  removeItem(filename)
-  const item: Item = { ...found.item, bucket: bucket as Bucket }
+  const item: Item = { ...takeItem(filename), bucket: bucket as Bucket }
   if (due) item.due = due
   if (bucket === 'today' && !item.today_since) item.today_since = todayStr()
   state[bucket as Bucket].unshift(item)
