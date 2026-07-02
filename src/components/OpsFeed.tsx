@@ -1,0 +1,178 @@
+import { AlertTriangle, Check, ChevronDown, ChevronUp, FileText, X } from 'lucide-react'
+import { useState } from 'react'
+import { BUCKET_META } from '../lib/bucketMeta'
+import type { Bucket, Op } from '../lib/types'
+
+export interface FeedEntry {
+  id: number
+  text: string
+  time: string
+  status: 'pending' | 'done' | 'error'
+  fallback?: boolean
+  ops?: Op[]
+  error?: string
+  /** Indexes of ops whose confirmation was resolved, mapped to the outcome label. */
+  resolved?: Record<number, string>
+}
+
+interface Props {
+  entries: FeedEntry[]
+  onOpenItem: (file: string) => void
+  onConfirmOp: (entryId: number, opIndex: number, op: Op) => void
+  onCancelOp: (entryId: number, opIndex: number) => void
+}
+
+/** Capture results feed: collapsed shows the latest capture, expanded shows the session history. */
+export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp }: Props) {
+  const [expanded, setExpanded] = useState(false)
+  if (entries.length === 0) return null
+
+  const visible = expanded ? entries : entries.slice(-1)
+
+  return (
+    <div className="shrink-0 border-t border-line bg-bg/80">
+      <div className="mx-auto max-w-2xl px-4">
+        {entries.length > 1 && (
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="flex w-full items-center justify-center gap-1 py-1 font-mono text-[10.5px] text-ink-faint transition-colors hover:text-ink-muted"
+          >
+            {expanded ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+            {expanded ? 'collapse' : `history ${entries.length}`}
+          </button>
+        )}
+        <div className={`flex flex-col gap-2 pb-3 ${expanded ? 'max-h-72 overflow-y-auto pt-1' : 'pt-2'}`}>
+          {visible.map(entry => (
+            <FeedRow
+              key={entry.id}
+              entry={entry}
+              onOpenItem={onOpenItem}
+              onConfirmOp={onConfirmOp}
+              onCancelOp={onCancelOp}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp }: {
+  entry: FeedEntry
+  onOpenItem: (file: string) => void
+  onConfirmOp: (entryId: number, opIndex: number, op: Op) => void
+  onCancelOp: (entryId: number, opIndex: number) => void
+}) {
+  return (
+    <div className="animate-fade-up">
+      <div className="mb-1 flex items-baseline gap-2">
+        <span className="font-mono text-[10.5px] text-ink-faint">{entry.time}</span>
+        <span className="truncate text-[12px] text-ink-muted">{entry.text}</span>
+        {entry.fallback && <span className="font-mono text-[10px] text-waiting">fallback</span>}
+      </div>
+
+      {entry.status === 'pending' && (
+        <div className="font-mono text-[11px] text-ink-faint">classifying…</div>
+      )}
+
+      {entry.status === 'error' && (
+        <div className="flex items-center gap-2 rounded-card border border-discard/30 bg-discard/10 px-3 py-2 text-[12px] text-discard">
+          <AlertTriangle size={13} />
+          {entry.error ?? 'Something went wrong'} — is the Java server running on :8080?
+        </div>
+      )}
+
+      {entry.status === 'done' && (entry.ops?.length ?? 0) === 0 && (
+        <div className="rounded-card border border-line px-3 py-2 text-[12px] text-ink-muted">
+          Nothing to file from that — try rephrasing.
+        </div>
+      )}
+
+      {entry.status === 'done' &&
+        entry.ops?.map((op, i) =>
+          op.requires_confirmation && !entry.resolved?.[i] ? (
+            <ConfirmCard key={i} op={op} onConfirm={() => onConfirmOp(entry.id, i, op)} onCancel={() => onCancelOp(entry.id, i)} />
+          ) : (
+            <OpCard key={i} op={op} outcome={entry.resolved?.[i]} onOpenItem={onOpenItem} />
+          ),
+        )}
+    </div>
+  )
+}
+
+function OpCard({ op, outcome, onOpenItem }: { op: Op; outcome?: string; onOpenItem: (file: string) => void }) {
+  const bucket = op.bucket && op.bucket in BUCKET_META ? (op.bucket as Bucket) : null
+  const meta = bucket ? BUCKET_META[bucket] : null
+  const clickable = op.op === 'create' && !!op.file && op.filed
+
+  return (
+    <div
+      onClick={clickable ? () => onOpenItem(op.file!) : undefined}
+      className={`mb-1 flex items-center gap-2.5 rounded-card border border-line bg-surface px-3 py-2 ${
+        clickable ? 'cursor-pointer transition-colors hover:border-line-strong' : ''
+      }`}
+    >
+      <span className="font-mono text-[10.5px] text-ink-faint">{op.op}</span>
+      {meta && (
+        <span
+          className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+          style={{ background: `color-mix(in srgb, ${meta.color} 15%, transparent)`, color: meta.color }}
+        >
+          {bucket}
+        </span>
+      )}
+      <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
+        {outcome ?? op.title ?? op.file ?? op.message ?? op.error ?? ''}
+      </span>
+      {op.error ? (
+        <AlertTriangle size={12} className="shrink-0 text-discard" />
+      ) : op.filed ? (
+        <Check size={12} className="shrink-0 text-done" />
+      ) : outcome ? null : (
+        <X size={12} className="shrink-0 text-ink-faint" />
+      )}
+      {clickable && <FileText size={12} className="shrink-0 text-ink-faint" />}
+    </div>
+  )
+}
+
+function ConfirmCard({ op, onConfirm, onCancel }: { op: Op; onConfirm: () => void; onCancel: () => void }) {
+  const isDismiss = op.op === 'dismiss'
+  return (
+    <div className="mb-1 rounded-card border border-waiting/40 bg-surface px-3 py-2.5">
+      <div className="mb-2 text-[12px] text-ink">
+        {isDismiss ? (
+          <>Discard <span className="text-discard">“{op.title ?? op.target_file}”</span>? This can’t be undone from the chat.</>
+        ) : (
+          <>Apply this edit to <span className="text-waiting">“{op.title ?? op.target_file}”</span>?</>
+        )}
+      </div>
+      {!isDismiss && (
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <div className="rounded-md border border-line bg-bg p-2">
+            <div className="mb-1 font-mono text-[9.5px] tracking-wide text-ink-faint uppercase">current</div>
+            <pre className="max-h-24 overflow-y-auto font-mono text-[11px] whitespace-pre-wrap text-ink-muted">{op.current_body || '(empty)'}</pre>
+          </div>
+          <div className="rounded-md border border-line bg-bg p-2">
+            <div className="mb-1 font-mono text-[9.5px] tracking-wide text-ink-faint uppercase">proposed</div>
+            <pre className="max-h-24 overflow-y-auto font-mono text-[11px] whitespace-pre-wrap text-ink">{op.proposed_body || '(empty)'}</pre>
+          </div>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={onConfirm}
+          className="rounded-md bg-accent px-3 py-1 text-[12px] text-bg transition-opacity hover:opacity-90"
+        >
+          Confirm
+        </button>
+        <button
+          onClick={onCancel}
+          className="rounded-md border border-line px-3 py-1 text-[12px] text-ink-muted transition-colors hover:text-ink"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}

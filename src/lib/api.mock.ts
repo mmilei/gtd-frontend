@@ -3,7 +3,9 @@
 import type { Bucket, BucketsMap, ChatResponse, Item, ProvidersResponse, ReviewData } from './types'
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
+  // local date, not UTC — after 21:00 GMT-3 toISOString() would already say "tomorrow"
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function makeFilename(title: string): string {

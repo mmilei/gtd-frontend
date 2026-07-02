@@ -7,6 +7,7 @@ import type { Bucket, Item } from '../lib/types'
 interface Props {
   item: Item
   bucket: Bucket
+  onOpen: (file: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
   onSendToToday: (item: Item) => Promise<boolean>
@@ -26,10 +27,11 @@ function daysInToday(item: Item, bucket: Bucket): number {
   return Math.floor((Date.now() - new Date(item.today_since).getTime()) / 86_400_000)
 }
 
-export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }: Props) {
+export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onSendToToday }: Props) {
   const [leaving, setLeaving] = useState(false)
 
-  async function run(action: (i: Item) => Promise<boolean>, sound = false) {
+  async function run(e: React.MouseEvent, action: (i: Item) => Promise<boolean>, sound = false) {
+    e.stopPropagation()
     if (sound) playBoink()
     setLeaving(true)
     const ok = await action(item)
@@ -44,13 +46,14 @@ export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }:
 
   return (
     <div
-      className={`group rounded-card border border-line bg-surface px-4 py-3 transition-colors hover:border-line-strong ${
+      onClick={() => onOpen(item.file)}
+      className={`group cursor-pointer rounded-card border border-line bg-surface px-4 py-3 transition-colors hover:border-line-strong ${
         leaving ? 'animate-card-out' : 'animate-fade-up'
       }`}
     >
       <div className="flex items-start gap-3">
         <button
-          onClick={() => run(onComplete, true)}
+          onClick={e => run(e, onComplete, true)}
           title="Mark as done"
           aria-label={`Mark "${title}" as done`}
           className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-line-strong text-transparent transition-colors hover:border-done hover:text-done"
@@ -81,7 +84,7 @@ export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }:
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           {bucket !== 'today' && (
             <button
-              onClick={() => run(onSendToToday)}
+              onClick={e => run(e, onSendToToday)}
               title="Move to Today"
               aria-label={`Move "${title}" to Today`}
               className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-raised hover:text-today"
@@ -90,7 +93,7 @@ export function ItemCard({ item, bucket, onComplete, onDismiss, onSendToToday }:
             </button>
           )}
           <button
-            onClick={() => run(onDismiss, true)}
+            onClick={e => run(e, onDismiss, true)}
             title="Dismiss"
             aria-label={`Dismiss "${title}"`}
             className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-raised hover:text-discard"
