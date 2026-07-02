@@ -91,6 +91,11 @@ export default function App() {
       try {
         const { fallback, ops } = await chat(text)
         setFeed(prev => prev.map(e => (e.id === id ? { ...e, status: 'done', fallback, ops } : e)))
+        const undoable = ops.filter(o => o.filed && (o.op === 'move' || o.op === 'done'))
+        if (undoable.length > 0) {
+          const last = undoable[undoable.length - 1]
+          showUndo(`${last.op === 'move' ? 'Moved' : 'Done'} — ${last.title ?? last.file ?? ''}`)
+        }
         void refresh()
       } catch (err) {
         setFeed(prev =>
@@ -102,7 +107,7 @@ export default function App() {
         setCapturing(false)
       }
     },
-    [refresh],
+    [refresh, showUndo],
   )
 
   const captureError = useCallback((message: string) => {
@@ -122,9 +127,11 @@ export default function App() {
       if (op.op === 'dismiss') {
         await dismissItem(target)
         resolveOp(entryId, opIndex, `Dismissed — ${op.title ?? target}`)
+        showUndo(`Dismissed — ${op.title ?? target}`)
       } else {
         await replaceBody(target, op.proposed_body ?? '')
         resolveOp(entryId, opIndex, `Applied — ${op.title ?? target}`)
+        showUndo(`Applied — ${op.title ?? target}`)
       }
       void refresh()
     } catch {

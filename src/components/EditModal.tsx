@@ -17,6 +17,12 @@ interface Props {
 const cleanTag = (t: string) =>
   t.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
 
+/** `<input type="date">` only accepts YYYY-MM-DD; backend dates may arrive as full ISO datetimes. */
+const normDate = (v?: string | null) => (v ? v.slice(0, 10) : '')
+
+/** Textareas normalize CRLF to LF, so vault bodies with \r\n would read as dirty otherwise. */
+const normBody = (s?: string | null) => (s ?? '').replace(/\r\n?/g, '\n')
+
 export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
   const [original, setOriginal] = useState<Item | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -43,12 +49,12 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
         if (cancelled) return
         setOriginal(item)
         setTitle(item.title ?? file)
-        setBody(item.body ?? '')
+        setBody(normBody(item.body))
         setBucket(item.bucket ?? null)
         setTags(item.tags ?? [])
         setPeople(item.delegado_a ?? [])
-        setDue(item.due ?? '')
-        setTodaySince(item.today_since ?? '')
+        setDue(normDate(item.due))
+        setTodaySince(normDate(item.today_since))
         setArea(item.area ?? '')
         setEstimate(item.estimate_minutes != null ? String(item.estimate_minutes) : '')
       })
@@ -65,21 +71,39 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
     const same = (a: string[], b: string[]) =>
       JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())
     return (
-      title !== (original.title ?? '') ||
-      body !== (original.body ?? '') ||
+      title !== (original.title ?? file) ||
+      body !== normBody(original.body) ||
       bucket !== (original.bucket ?? null) ||
       !same(tags, original.tags ?? []) ||
       !same(people, original.delegado_a ?? []) ||
-      (due || null) !== (original.due ?? null) ||
-      (todaySince || null) !== (original.today_since ?? null) ||
+      (due || null) !== (normDate(original.due) || null) ||
+      (todaySince || null) !== (normDate(original.today_since) || null) ||
       (area || null) !== (original.area ?? null) ||
       (estimate ? Number(estimate) : null) !== (original.estimate_minutes ?? null)
     )
-  }, [original, title, body, bucket, tags, people, due, todaySince, area, estimate])
+  }, [original, file, title, body, bucket, tags, people, due, todaySince, area, estimate])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
     else onClose()
+  }
+
+  /** Throw away edits and restore the just-opened state — the modal stays open. */
+  function resetFromOriginal() {
+    setConfirmingDiscard(false)
+    if (!original) {
+      onClose()
+      return
+    }
+    setTitle(original.title ?? file)
+    setBody(normBody(original.body))
+    setBucket(original.bucket ?? null)
+    setTags(original.tags ?? [])
+    setPeople(original.delegado_a ?? [])
+    setDue(normDate(original.due))
+    setTodaySince(normDate(original.today_since))
+    setArea(original.area ?? '')
+    setEstimate(original.estimate_minutes != null ? String(original.estimate_minutes) : '')
   }
 
   async function save() {
@@ -90,17 +114,17 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
       if (bucket && bucket !== original.bucket) {
         await moveItem(file, bucket, bucket === 'today' ? due || null : null)
       }
-      if (body !== (original.body ?? '')) await replaceBody(file, body)
+      if (body !== normBody(original.body)) await replaceBody(file, body)
 
       const nextTags = tags.includes('gtd') ? tags : ['gtd', ...tags]
       const meta: Partial<Item> = {}
-      if (title && title !== (original.title ?? '')) meta.title = title
+      if (title && title !== (original.title ?? file)) meta.title = title
       if (JSON.stringify([...nextTags].sort()) !== JSON.stringify([...(original.tags ?? [])].sort())) meta.tags = nextTags
-      if ((due || null) !== (original.due ?? null)) meta.due = due || null
+      if ((due || null) !== (normDate(original.due) || null)) meta.due = due || null
       if (bucket === 'today' && !original.today_since && !todaySince) {
         const d = new Date()
         meta.today_since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      } else if ((todaySince || null) !== (original.today_since ?? null)) {
+      } else if ((todaySince || null) !== (normDate(original.today_since) || null)) {
         meta.today_since = todaySince || null
       }
       if (JSON.stringify([...people].sort()) !== JSON.stringify([...(original.delegado_a ?? [])].sort())) meta.delegado_a = people
@@ -259,7 +283,7 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
         {confirmingDiscard ? (
           <div className="flex items-center gap-3 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
             <span className="flex-1 text-[12.5px] text-ink">Discard unsaved changes?</span>
-            <button onClick={onClose} className="rounded-md bg-discard/20 px-3 py-1 text-[12px] text-discard">Discard</button>
+            <button onClick={resetFromOriginal} className="rounded-md bg-discard/20 px-3 py-1 text-[12px] text-discard">Discard</button>
             <button onClick={() => setConfirmingDiscard(false)} className="rounded-md border border-line px-3 py-1 text-[12px] text-ink-muted">Keep editing</button>
           </div>
         ) : (

@@ -28,6 +28,7 @@ export interface Op {
   message?: string
   requires_confirmation?: boolean
   target_file?: string
+  new_bucket?: string
   current_body?: string
   proposed_body?: string
 }
