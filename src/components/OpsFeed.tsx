@@ -108,7 +108,7 @@ function OpCard({ op, outcome, onOpenItem }: { op: Op; outcome?: string; onOpenI
   const meta = bucket ? BUCKET_META[bucket] : null
   const targetFile = op.file ?? op.target_file
   const clickable = !!targetFile && !op.error && OPENABLE_OPS.has(op.op) && (op.op !== 'create' || !!op.filed)
-  const editDetail = (op.op === 'edit' || op.op === 'update') && outcome ? op.proposed_body : undefined
+  const editDetail = (op.op === 'edit' || op.op === 'update') && outcome?.startsWith('Applied') ? op.proposed_body : undefined
 
   return (
     <div
