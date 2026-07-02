@@ -100,38 +100,48 @@ function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp }: {
   )
 }
 
+const OPENABLE_OPS = new Set(['create', 'edit', 'update', 'move', 'done'])
+
 function OpCard({ op, outcome, onOpenItem }: { op: Op; outcome?: string; onOpenItem: (file: string) => void }) {
-  const bucket = op.bucket && op.bucket in BUCKET_META ? (op.bucket as Bucket) : null
+  const displayBucket = op.new_bucket ?? op.bucket
+  const bucket = displayBucket && displayBucket in BUCKET_META ? (displayBucket as Bucket) : null
   const meta = bucket ? BUCKET_META[bucket] : null
-  const clickable = op.op === 'create' && !!op.file && op.filed
+  const targetFile = op.file ?? op.target_file
+  const clickable = !!targetFile && !op.error && OPENABLE_OPS.has(op.op) && (op.op !== 'create' || !!op.filed)
+  const editDetail = (op.op === 'edit' || op.op === 'update') && outcome ? op.proposed_body : undefined
 
   return (
     <div
-      onClick={clickable ? () => onOpenItem(op.file!) : undefined}
-      className={`mb-1 flex items-center gap-2.5 rounded-card border border-line bg-surface px-3 py-2 ${
+      onClick={clickable ? () => onOpenItem(targetFile!) : undefined}
+      className={`mb-1 rounded-card border border-line bg-surface px-3 py-2 ${
         clickable ? 'cursor-pointer transition-colors hover:border-line-strong' : ''
       }`}
     >
-      <span className="font-mono text-[10.5px] text-ink-faint">{op.op}</span>
-      {meta && (
-        <span
-          className="rounded-full px-2 py-0.5 font-mono text-[10px]"
-          style={{ background: `color-mix(in srgb, ${meta.color} 15%, transparent)`, color: meta.color }}
-        >
-          {bucket}
+      <div className="flex items-center gap-2.5">
+        <span className="font-mono text-[10.5px] text-ink-faint">{op.op}</span>
+        {meta && (
+          <span
+            className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+            style={{ background: `color-mix(in srgb, ${meta.color} 15%, transparent)`, color: meta.color }}
+          >
+            {bucket}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
+          {outcome ?? op.title ?? op.file ?? op.message ?? op.error ?? ''}
         </span>
+        {op.error ? (
+          <AlertTriangle size={12} className="shrink-0 text-discard" />
+        ) : op.filed ? (
+          <Check size={12} className="shrink-0 text-done" />
+        ) : outcome ? null : (
+          <X size={12} className="shrink-0 text-ink-faint" />
+        )}
+        {clickable && <FileText size={12} className="shrink-0 text-ink-faint" />}
+      </div>
+      {editDetail && (
+        <div className="mt-1 truncate font-mono text-[11px] text-ink-faint">{editDetail}</div>
       )}
-      <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
-        {outcome ?? op.title ?? op.file ?? op.message ?? op.error ?? ''}
-      </span>
-      {op.error ? (
-        <AlertTriangle size={12} className="shrink-0 text-discard" />
-      ) : op.filed ? (
-        <Check size={12} className="shrink-0 text-done" />
-      ) : outcome ? null : (
-        <X size={12} className="shrink-0 text-ink-faint" />
-      )}
-      {clickable && <FileText size={12} className="shrink-0 text-ink-faint" />}
     </div>
   )
 }
