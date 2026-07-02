@@ -14,10 +14,9 @@ interface Props {
   onOpenItem: (file: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
-  onSendToToday: (item: Item) => Promise<boolean>
 }
 
-export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onOpenItem, onComplete, onDismiss, onSendToToday }: Props) {
+export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onOpenItem, onComplete, onDismiss }: Props) {
   const meta = BUCKET_META[bucket]
   const [query, setQuery] = useState('')
 
@@ -73,7 +72,6 @@ export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, o
                 onOpen={onOpenItem}
                 onComplete={onComplete}
                 onDismiss={onDismiss}
-                onSendToToday={onSendToToday}
               />
             ))}
           </div>

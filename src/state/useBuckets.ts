@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dismissItem, getBuckets, getToday, markDone, moveItem } from '../lib/api'
+import { dismissItem, getBuckets, getToday, markDone } from '../lib/api'
 import type { Bucket, BucketsMap, Item } from '../lib/types'
 
 const EMPTY: BucketsMap = { today: [], backlog: [], waiting: [], someday: [], reference: [] }
@@ -15,7 +15,6 @@ export interface BucketsState {
   refresh: () => Promise<void>
   completeItem: (item: Item) => Promise<boolean>
   removeItem: (item: Item) => Promise<boolean>
-  sendToToday: (item: Item) => Promise<boolean>
 }
 
 export function useBuckets(): BucketsState {
@@ -79,10 +78,6 @@ export function useBuckets(): BucketsState {
     (item: Item) => withOptimisticRemove(item, () => dismissItem(item.file)),
     [withOptimisticRemove],
   )
-  const sendToToday = useCallback(
-    (item: Item) => withOptimisticRemove(item, () => moveItem(item.file, 'today')),
-    [withOptimisticRemove],
-  )
 
-  return { buckets, apiStatus, refresh, completeItem, removeItem, sendToToday }
+  return { buckets, apiStatus, refresh, completeItem, removeItem }
 }

@@ -20,7 +20,7 @@ let feedId = 0
 const timeNow = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
 export default function App() {
-  const { buckets, apiStatus, refresh, completeItem, removeItem, sendToToday } = useBuckets()
+  const { buckets, apiStatus, refresh, completeItem, removeItem } = useBuckets()
   const [bucket, setBucket] = useState<Bucket>('today')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [feed, setFeed] = useState<FeedEntry[]>([])
@@ -128,7 +128,6 @@ export default function App() {
 
   const complete = useMemo(() => withUndo(completeItem, 'Done'), [withUndo, completeItem])
   const remove = useMemo(() => withUndo(removeItem, 'Dismissed'), [withUndo, removeItem])
-  const toToday = useMemo(() => withUndo(sendToToday, 'Moved to Today'), [withUndo, sendToToday])
 
   return (
     <div className="flex h-full flex-col">
@@ -150,7 +149,6 @@ export default function App() {
             onOpenItem={setEditingFile}
             onComplete={complete}
             onDismiss={remove}
-            onSendToToday={toToday}
           />
           <OpsFeed entries={feed} onOpenItem={setEditingFile} onConfirmOp={confirmOp} onCancelOp={(id, i) => resolveOp(id, i, 'Cancelled — no changes')} />
           <CaptureBar busy={capturing} onSend={sendCapture} onError={captureError} />

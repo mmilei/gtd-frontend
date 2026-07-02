@@ -1,4 +1,4 @@
-import { ArrowRight, Check, X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { playBoink } from '../lib/sound'
 import { SYSTEM_TAGS } from '../lib/types'
@@ -10,7 +10,6 @@ interface Props {
   onOpen: (file: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
-  onSendToToday: (item: Item) => Promise<boolean>
 }
 
 function bodySnippet(body?: string): string {
@@ -27,7 +26,7 @@ function daysInToday(item: Item, bucket: Bucket): number {
   return Math.floor((Date.now() - new Date(item.today_since).getTime()) / 86_400_000)
 }
 
-export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onSendToToday }: Props) {
+export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss }: Props) {
   const [leaving, setLeaving] = useState(false)
 
   async function run(e: React.MouseEvent, action: (i: Item) => Promise<boolean>, sound = false) {
@@ -82,16 +81,6 @@ export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onSendTo
         </div>
 
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          {bucket !== 'today' && (
-            <button
-              onClick={e => run(e, onSendToToday)}
-              title="Move to Today"
-              aria-label={`Move "${title}" to Today`}
-              className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-raised hover:text-today"
-            >
-              <ArrowRight size={14} />
-            </button>
-          )}
           <button
             onClick={e => run(e, onDismiss, true)}
             title="Dismiss"
