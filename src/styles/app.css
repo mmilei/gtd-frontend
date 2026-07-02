@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+/*
+ * GTD Brain — design tokens ("quiet ledger")
+ * One warm graphite surface, one copper accent, desaturated bucket hues.
+ * Data (dates, counts, timers) always renders in mono — that's the signature.
+ */
+@theme {
+  --color-bg: #131313;
+  --color-surface: #1b1b1c;
+  --color-raised: #222224;
+  --color-line: #2a2a2c;
+  --color-line-strong: #38383b;
+
+  --color-ink: #e9e7e2;
+  --color-ink-muted: #8f8c85;
+  --color-ink-faint: #5a5850;
+
+  --color-accent: #e07850;
+  --color-accent-soft: #e0785022;
+
+  --color-today: #7fb4a8;
+  --color-backlog: #9095c9;
+  --color-waiting: #c9a96e;
+  --color-someday: #83a883;
+  --color-reference: #8f8c85;
+  --color-discard: #c97b7b;
+  --color-done: #8fbf8f;
+
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-card: 10px;
+
+  --animate-card-out: card-out 0.28s ease-in forwards;
+  --animate-fade-up: fade-up 0.2s ease-out;
+
+  @keyframes card-out {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.96) translateY(4px); }
+  }
+  @keyframes fade-up {
+    0% { opacity: 0; transform: translateY(4px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
