@@ -82,6 +82,24 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
     else onClose()
   }
 
+  /** Throw away edits and restore the just-opened state — the modal stays open. */
+  function resetFromOriginal() {
+    setConfirmingDiscard(false)
+    if (!original) {
+      onClose()
+      return
+    }
+    setTitle(original.title ?? file)
+    setBody(original.body ?? '')
+    setBucket(original.bucket ?? null)
+    setTags(original.tags ?? [])
+    setPeople(original.delegado_a ?? [])
+    setDue(original.due ?? '')
+    setTodaySince(original.today_since ?? '')
+    setArea(original.area ?? '')
+    setEstimate(original.estimate_minutes != null ? String(original.estimate_minutes) : '')
+  }
+
   async function save() {
     if (!original) return
     setSaving(true)
@@ -259,7 +277,7 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
         {confirmingDiscard ? (
           <div className="flex items-center gap-3 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
             <span className="flex-1 text-[12.5px] text-ink">Discard unsaved changes?</span>
-            <button onClick={onClose} className="rounded-md bg-discard/20 px-3 py-1 text-[12px] text-discard">Discard</button>
+            <button onClick={resetFromOriginal} className="rounded-md bg-discard/20 px-3 py-1 text-[12px] text-discard">Discard</button>
             <button onClick={() => setConfirmingDiscard(false)} className="rounded-md border border-line px-3 py-1 text-[12px] text-ink-muted">Keep editing</button>
           </div>
         ) : (
