@@ -20,11 +20,10 @@ interface Props {
   onOpenItem: (file: string) => void
   onConfirmOp: (entryId: string, opIndex: number, op: Op) => void
   onCancelOp: (entryId: string, opIndex: number) => void
-  onReviewItem: (entryId: string, opIndex: number, op: Op) => void
 }
 
 /** Capture results feed: collapsed shows the latest capture, expanded shows the session history. */
-export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp, onReviewItem }: Props) {
+export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp }: Props) {
   const [expanded, setExpanded] = useState(false)
   if (entries.length === 0) return null
 
@@ -50,7 +49,6 @@ export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp, onReview
               onOpenItem={onOpenItem}
               onConfirmOp={onConfirmOp}
               onCancelOp={onCancelOp}
-              onReviewItem={onReviewItem}
             />
           ))}
         </div>
@@ -59,12 +57,11 @@ export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp, onReview
   )
 }
 
-function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp, onReviewItem }: {
+function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp }: {
   entry: FeedEntry
   onOpenItem: (file: string) => void
   onConfirmOp: (entryId: string, opIndex: number, op: Op) => void
   onCancelOp: (entryId: string, opIndex: number) => void
-  onReviewItem: (entryId: string, opIndex: number, op: Op) => void
 }) {
   return (
     <div className="animate-fade-up">
@@ -95,8 +92,6 @@ function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp, onReviewItem }: {
         entry.ops?.map((op, i) =>
           op.requires_confirmation && !entry.resolved?.[i] ? (
             <ConfirmCard key={i} op={op} onConfirm={() => onConfirmOp(entry.id, i, op)} onCancel={() => onCancelOp(entry.id, i)} />
-          ) : op.op === 'create' && op.confirmed === false && !entry.resolved?.[i] ? (
-            <ReviewCard key={i} op={op} onReview={() => onReviewItem(entry.id, i, op)} />
           ) : (
             <OpCard key={i} op={op} outcome={entry.resolved?.[i]} onOpenItem={onOpenItem} />
           ),
@@ -114,6 +109,16 @@ function OpCard({ op, outcome, onOpenItem }: { op: Op; outcome?: string; onOpenI
   const targetFile = op.file ?? op.target_file
   const clickable = !!targetFile && !op.error && OPENABLE_OPS.has(op.op) && (op.op !== 'create' || !!op.filed)
   const editDetail = (op.op === 'edit' || op.op === 'update') && outcome?.startsWith('Applied') ? op.proposed_body : undefined
+  // create with filed:false (bucket "now"/"discard") comes back with an explanatory `message` —
+  // op.title alone previously shadowed it in the `??` chain, so "asd" → discard rendered as just
+  // "asd" with no indication it was discarded rather than filed.
+  const notFiledLabel =
+    op.op === 'create' && !op.filed && op.message
+      ? op.title
+        ? `"${op.title}" — ${op.message}`
+        : op.message
+      : undefined
+  const isDiscarded = op.op === 'create' && !op.filed && op.bucket === 'discard'
 
   return (
     <div
@@ -133,14 +138,14 @@ function OpCard({ op, outcome, onOpenItem }: { op: Op; outcome?: string; onOpenI
           </span>
         )}
         <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
-          {outcome ?? op.title ?? op.file ?? op.message ?? op.error ?? ''}
+          {outcome ?? notFiledLabel ?? op.title ?? op.file ?? op.message ?? op.error ?? ''}
         </span>
         {op.error ? (
           <AlertTriangle size={12} className="shrink-0 text-discard" />
         ) : op.filed ? (
           <Check size={12} className="shrink-0 text-done" />
         ) : outcome ? null : (
-          <X size={12} className="shrink-0 text-ink-faint" />
+          <X size={12} className={`shrink-0 ${isDiscarded ? 'text-discard' : 'text-ink-faint'}`} />
         )}
         {clickable && <FileText size={12} className="shrink-0 text-ink-faint" />}
       </div>
@@ -188,23 +193,6 @@ function ConfirmCard({ op, onConfirm, onCancel }: { op: Op; onConfirm: () => voi
           Cancel
         </button>
       </div>
-    </div>
-  )
-}
-
-/** Shown when create returns confirmed: false — the task is already filed, low classifier confidence just flags it for a quick look. */
-function ReviewCard({ op, onReview }: { op: Op; onReview: () => void }) {
-  return (
-    <div className="mb-1 flex items-center justify-between gap-2 rounded-card border border-waiting/40 bg-surface px-3 py-2.5">
-      <div className="min-w-0 text-[12px] text-ink">
-        Filed <span className="text-waiting">“{op.title ?? op.file}”</span> with low confidence — look right?
-      </div>
-      <button
-        onClick={onReview}
-        className="shrink-0 rounded-md bg-accent px-3 py-1 text-[12px] text-bg transition-opacity hover:opacity-90"
-      >
-        Looks good
-      </button>
     </div>
   )
 }

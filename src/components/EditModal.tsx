@@ -131,6 +131,9 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
       const estimateNum = estimate ? Math.max(1, Math.round(Number(estimate))) : null
       if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
+      // A manual save is itself a confirmation — with or without other edits — so a task the
+      // classifier filed with low confidence (confirmed: false) never needs a separate review step.
+      if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
       setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags: nextTags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null })

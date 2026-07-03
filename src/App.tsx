@@ -12,7 +12,7 @@ import { TriageOverlay } from './components/TriageOverlay'
 import { UndoToast, useUndoToast } from './components/UndoToast'
 import { AmbientScene } from './components/AmbientScene'
 import { FocusOverlay } from './components/FocusOverlay'
-import { chat, confirmChatOp, confirmItem, getChatHistory } from './lib/api'
+import { chat, confirmChatOp, getChatHistory } from './lib/api'
 import { celebrate } from './lib/celebration'
 import { orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
@@ -136,6 +136,10 @@ export default function App() {
           const last = undoable[undoable.length - 1]
           showUndo(`${last.op === 'move' ? 'Moved' : 'Done'} — ${last.title ?? last.file ?? ''}`)
         }
+        // Low classifier confidence (confirmed: false) opens the same editor a manual edit uses —
+        // saving there (even with no changes) is itself the confirmation.
+        const needsReview = ops.find(o => o.op === 'create' && o.confirmed === false && o.file)
+        if (needsReview?.file) setEditingFile(needsReview.file)
         void refresh()
       } catch (err) {
         setFeed(prev =>
@@ -147,7 +151,7 @@ export default function App() {
         setCapturing(false)
       }
     },
-    [refresh, showUndo],
+    [refresh, showUndo, setEditingFile],
   )
 
   const captureError = useCallback((message: string) => {
@@ -169,16 +173,6 @@ export default function App() {
       resolveOp(entryId, opIndex, `${label} — ${op.title ?? target}`)
       showUndo(`${label} — ${op.title ?? target}`)
       void refresh()
-    } catch {
-      // card stays actionable for a retry
-    }
-  }
-
-  async function reviewItem(entryId: string, opIndex: number, op: Op) {
-    if (!op.file) return
-    try {
-      await confirmItem(op.file)
-      resolveOp(entryId, opIndex, `Reviewed — ${op.title ?? op.file}`)
     } catch {
       // card stays actionable for a retry
     }
@@ -239,7 +233,6 @@ export default function App() {
             onOpenItem={setEditingFile}
             onConfirmOp={confirmOp}
             onCancelOp={(id, i) => resolveOp(id, i, 'Cancelled — no changes')}
-            onReviewItem={reviewItem}
           />
           <CaptureBar busy={capturing} onSend={sendCapture} onError={captureError} />
         </main>
