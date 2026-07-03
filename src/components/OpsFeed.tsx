@@ -119,6 +119,10 @@ function OpCard({ op, outcome, onOpenItem }: { op: Op; outcome?: string; onOpenI
         : op.message
       : undefined
   const isDiscarded = op.op === 'create' && !op.filed && op.bucket === 'discard'
+  // The backend always labels a new-task classification "create", even when the bucket (now/
+  // discard) means nothing gets filed — showing that literal op type next to "not archived" read
+  // as a contradiction ("create... No archivado."). Show what actually happened instead.
+  const opLabel = op.op === 'create' && !op.filed && (op.bucket === 'discard' || op.bucket === 'now') ? op.bucket : op.op
 
   return (
     <div
@@ -128,7 +132,7 @@ function OpCard({ op, outcome, onOpenItem }: { op: Op; outcome?: string; onOpenI
       }`}
     >
       <div className="flex items-center gap-2.5">
-        <span className="font-mono text-[10.5px] text-ink-faint">{op.op}</span>
+        <span className="font-mono text-[10.5px] text-ink-faint">{opLabel}</span>
         {meta && (
           <span
             className="rounded-full px-2 py-0.5 font-mono text-[10px]"
