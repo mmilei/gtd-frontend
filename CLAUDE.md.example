@@ -1,0 +1,37 @@
+**THIS IS AN EXAMPLE FILE. Create your own `CLAUDE.md` based on it — `CLAUDE.md` is gitignored so each developer can keep local paths and personal conventions out of the repo.**
+
+# gtd-frontend — agent instructions
+
+## What this is
+
+React 19 + TypeScript + Vite 6 + Tailwind CSS v4 frontend for
+[java-gtd](https://github.com/mmilei/java-gtd). See [README.md](README.md) for the
+feature overview, stack, and project structure.
+
+## Read first
+
+- `README.md` — features, getting started, `src/` structure
+- `src/lib/types.ts` — the API contract shared with the backend
+
+## Working rules
+
+- **Never push to master directly.** Branch → push → pull request.
+- Run `npm run build` (type-check + bundle) before committing.
+- **Never put backend code in this repo.** The API lives in
+  [java-gtd](https://github.com/mmilei/java-gtd); this repo only talks to it over HTTP.
+- Keep `src/lib/api.ts` and `src/lib/api.mock.ts` in sync — the mock must expose the
+  same functions and data shapes as the real client (`VITE_MOCK=true` swaps them at build time).
+
+## Development
+
+```bash
+npm run dev              # against a local backend on :8080 (Vite proxies /api/*)
+VITE_MOCK=true npm run dev   # no backend needed — in-memory mock
+```
+
+Pushes to `master` deploy the mock build to GitHub Pages automatically.
+
+## Notes for your own CLAUDE.md
+
+Add here whatever is personal to your machine or workflow: absolute paths, restart scripts,
+where you track project TODOs, commit-message conventions, etc.
