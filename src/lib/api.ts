@@ -1,4 +1,4 @@
-import type { BucketsMap, ChatResponse, Item, ProvidersResponse, ReviewData } from './types'
+import type { BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, ProvidersResponse, ReviewData } from './types'
 
 const BASE = '/api'
 
@@ -65,6 +65,34 @@ export function getReview(params: Record<string, string> = {}): Promise<ReviewDa
 
 export function undo(): Promise<{ undone: boolean }> {
   return request('/undo', { method: 'POST' })
+}
+
+/** Approves an edit/update/dismiss the LLM proposed (requires_confirmation ops from POST /chat) — distinct from the generic PUT /body and POST /dismiss a direct edit uses. */
+export function confirmChatOp(body: {
+  target_file: string
+  op: string
+  proposed_body?: string
+  chat_ref?: string
+}): Promise<{ confirmed: boolean; file: string; op: string }> {
+  return request('/chat/confirm', json(body))
+}
+
+/** Flips a low-confidence task's confirmed:false -> true after review. */
+export function confirmItem(filename: string): Promise<{ confirmed: boolean; file: string }> {
+  return request(`/items/${encodeURIComponent(filename)}/confirm`, { method: 'POST' })
+}
+
+export function getChatHistory(limit = 50): Promise<ChatHistoryEntry[]> {
+  return request(`/chat/history?limit=${limit}`)
+}
+
+export function getEvents(params: { limit?: number; actor?: string; op?: string } = {}): Promise<EventEntry[]> {
+  const q = new URLSearchParams()
+  if (params.limit) q.set('limit', String(params.limit))
+  if (params.actor) q.set('actor', params.actor)
+  if (params.op) q.set('op', params.op)
+  const qs = q.toString()
+  return request(`/events${qs ? '?' + qs : ''}`)
 }
 
 export function transcribe(audioBlob: Blob): Promise<{ text: string }> {

@@ -21,7 +21,8 @@ Frontend for [java-gtd](https://github.com/mmilei/java-gtd). Type or dictate any
 - **Focus mode** — single-task view with a timer and completion chime. One thing at a time.
 - **Guided triage** — walk the backlog item by item with keyboard shortcuts (1–4: today / skip / someday / dismiss) and get a summary at the end.
 - **Weekly review** — stale tasks, upcoming due dates, and the week's completions in one overlay.
-- **Undo everywhere** — every mutation (from the UI or the chat) shows an undo toast backed by the API's undo stack.
+- **Undo everywhere** — every mutation (from the UI or the chat) shows an undo toast backed by the API's durable, restart-safe event log.
+- **History panel** — a durable, cross-session log of every create/move/done/dismiss/undo (who did it — you or the LLM — and when), separate from the current session's capture feed.
 - **Tag bar** — one-click context filtering within the active bucket.
 - **Multi-provider** — switch the backend LLM between Groq and local Ollama from the header.
 - **Ambient scene** — a subtle Three.js ember field that bursts on completions (disabled under `prefers-reduced-motion`).
@@ -66,6 +67,7 @@ src/
     FocusOverlay.tsx   single-task focus mode with timer
     TriageOverlay.tsx  keyboard-driven backlog triage
     ReviewOverlay.tsx  weekly review
+    HistoryPanel.tsx   durable cross-session event log
     AmbientScene.tsx   Three.js ember field
   lib/
     api.ts             typed HTTP client for java-gtd

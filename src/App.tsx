@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BucketRail } from './components/BucketRail'
 import { CaptureBar } from './components/CaptureBar'
 import { EditModal } from './components/EditModal'
 import { Header } from './components/Header'
+import { HistoryPanel } from './components/HistoryPanel'
 import { ItemList } from './components/ItemList'
 import { OpsFeed } from './components/OpsFeed'
 import type { FeedEntry } from './components/OpsFeed'
@@ -11,17 +12,45 @@ import { TriageOverlay } from './components/TriageOverlay'
 import { UndoToast, useUndoToast } from './components/UndoToast'
 import { AmbientScene } from './components/AmbientScene'
 import { FocusOverlay } from './components/FocusOverlay'
-import { chat, dismissItem, replaceBody } from './lib/api'
+import { chat, confirmChatOp, confirmItem, getChatHistory } from './lib/api'
 import { celebrate } from './lib/celebration'
 import { orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
-import type { Bucket, Item, Op } from './lib/types'
+import type { Bucket, ChatHistoryEntry, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
 
 const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
 
-let feedId = 0
-const timeNow = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+let localFeedId = 0
+const nextLocalId = () => `local-${++localFeedId}`
+const formatTime = (iso?: string) =>
+  new Date(iso ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+/** Pairs up consecutive user/assistant transcript entries into the same shape a live capture produces. */
+function hydrateFeed(history: ChatHistoryEntry[]): FeedEntry[] {
+  const entries: FeedEntry[] = []
+  for (let i = 0; i < history.length; i++) {
+    const h = history[i]
+    if (h.role !== 'user') continue
+    const next = history[i + 1]
+    const assistant = next?.role === 'assistant' ? next : undefined
+    const resolved: Record<number, string> = {}
+    assistant?.ops?.forEach((op, idx) => {
+      if (op.requires_confirmation && op.resolved) resolved[idx] = 'Resolved'
+    })
+    entries.push({
+      id: h.id,
+      text: h.text ?? '',
+      time: formatTime(h.ts),
+      status: assistant ? 'done' : 'pending',
+      fallback: assistant?.fallback,
+      ops: assistant?.ops,
+      resolved,
+    })
+    if (assistant) i++
+  }
+  return entries
+}
 
 export default function App() {
   const { buckets, apiStatus, refresh, completeItem, removeItem } = useBuckets()
@@ -32,9 +61,20 @@ export default function App() {
   const [editingFile, setEditingFile] = useState<string | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [focusSession, setFocusSession] = useState<{ queue: Item[]; startIndex: number } | null>(null)
 
   const { toast, show: showUndo, dismiss: dismissToast, runUndo } = useUndoToast(refresh)
+
+  // Rehydrate this session's feed from the durable transcript so a reload doesn't lose
+  // still-pending requires_confirmation cards (or the fact that earlier captures happened).
+  useEffect(() => {
+    getChatHistory()
+      .then(history => setFeed(hydrateFeed(history)))
+      .catch(() => {
+        // no transcript yet (fresh vault) or backend unavailable — starting empty is fine
+      })
+  }, [])
 
   function selectBucket(next: Bucket) {
     setBucket(next)
@@ -85,8 +125,8 @@ export default function App() {
   // ── Capture ────────────────────────────────────────────────
   const sendCapture = useCallback(
     async (text: string) => {
-      const id = ++feedId
-      setFeed(prev => [...prev, { id, text, time: timeNow(), status: 'pending' }])
+      const id = nextLocalId()
+      setFeed(prev => [...prev, { id, text, time: formatTime(), status: 'pending' }])
       setCapturing(true)
       try {
         const { fallback, ops } = await chat(text)
@@ -111,29 +151,34 @@ export default function App() {
   )
 
   const captureError = useCallback((message: string) => {
-    setFeed(prev => [...prev, { id: ++feedId, text: '(voice)', time: timeNow(), status: 'error', error: message }])
+    setFeed(prev => [...prev, { id: nextLocalId(), text: '(voice)', time: formatTime(), status: 'error', error: message }])
   }, [])
 
-  function resolveOp(entryId: number, opIndex: number, outcome: string) {
+  function resolveOp(entryId: string, opIndex: number, outcome: string) {
     setFeed(prev =>
       prev.map(e => (e.id === entryId ? { ...e, resolved: { ...e.resolved, [opIndex]: outcome } } : e)),
     )
   }
 
-  async function confirmOp(entryId: number, opIndex: number, op: Op) {
+  async function confirmOp(entryId: string, opIndex: number, op: Op) {
     const target = op.target_file
-    if (!target) return
+    if (!target || !op.op) return
     try {
-      if (op.op === 'dismiss') {
-        await dismissItem(target)
-        resolveOp(entryId, opIndex, `Dismissed — ${op.title ?? target}`)
-        showUndo(`Dismissed — ${op.title ?? target}`)
-      } else {
-        await replaceBody(target, op.proposed_body ?? '')
-        resolveOp(entryId, opIndex, `Applied — ${op.title ?? target}`)
-        showUndo(`Applied — ${op.title ?? target}`)
-      }
+      await confirmChatOp({ target_file: target, op: op.op, proposed_body: op.proposed_body, chat_ref: op.chat_ref })
+      const label = op.op === 'dismiss' ? 'Dismissed' : 'Applied'
+      resolveOp(entryId, opIndex, `${label} — ${op.title ?? target}`)
+      showUndo(`${label} — ${op.title ?? target}`)
       void refresh()
+    } catch {
+      // card stays actionable for a retry
+    }
+  }
+
+  async function reviewItem(entryId: string, opIndex: number, op: Op) {
+    if (!op.file) return
+    try {
+      await confirmItem(op.file)
+      resolveOp(entryId, opIndex, `Reviewed — ${op.title ?? op.file}`)
     } catch {
       // card stays actionable for a retry
     }
@@ -169,7 +214,12 @@ export default function App() {
           Demo mode — data is fictional and resets on reload
         </div>
       )}
-      <Header apiStatus={apiStatus} onOpenTriage={() => setTriageOpen(true)} onOpenReview={() => setReviewOpen(true)} />
+      <Header
+        apiStatus={apiStatus}
+        onOpenTriage={() => setTriageOpen(true)}
+        onOpenReview={() => setReviewOpen(true)}
+        onOpenHistory={() => setHistoryOpen(true)}
+      />
       <div className="flex min-h-0 flex-1">
         <BucketRail buckets={buckets} active={bucket} onSelect={selectBucket} />
         <main className="flex min-w-0 flex-1 flex-col">
@@ -184,7 +234,13 @@ export default function App() {
             onDismiss={remove}
             onFocus={bucket === 'today' ? startFocus : undefined}
           />
-          <OpsFeed entries={feed} onOpenItem={setEditingFile} onConfirmOp={confirmOp} onCancelOp={(id, i) => resolveOp(id, i, 'Cancelled — no changes')} />
+          <OpsFeed
+            entries={feed}
+            onOpenItem={setEditingFile}
+            onConfirmOp={confirmOp}
+            onCancelOp={(id, i) => resolveOp(id, i, 'Cancelled — no changes')}
+            onReviewItem={reviewItem}
+          />
           <CaptureBar busy={capturing} onSend={sendCapture} onError={captureError} />
         </main>
       </div>
@@ -199,6 +255,7 @@ export default function App() {
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
       {reviewOpen && <ReviewOverlay onClose={() => setReviewOpen(false)} onChanged={() => void refresh()} />}
+      {historyOpen && <HistoryPanel onClose={() => setHistoryOpen(false)} />}
       {focusSession && (
         <FocusOverlay
           queue={focusSession.queue}

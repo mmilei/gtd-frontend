@@ -13,6 +13,8 @@ export interface Item {
   area?: string | null
   markdownified?: boolean
   estimate_minutes?: number | null
+  /** false = classifier used the low-confidence fallback prompt, pending review. Absent/true/null = confirmed. */
+  confirmed?: boolean | null
 }
 
 export type BucketsMap = Record<Bucket, Item[]>
@@ -31,11 +33,38 @@ export interface Op {
   new_bucket?: string
   current_body?: string
   proposed_body?: string
+  /** Present on requires_confirmation ops — the chat message id to send back to POST /api/chat/confirm. */
+  chat_ref?: string
+  /** On `create`: false when the classifier used the low-confidence fallback prompt. */
+  confirmed?: boolean
+  /** Set by GET /api/chat/history on rehydration — whether a requires_confirmation op was already resolved. */
+  resolved?: boolean
 }
 
 export interface ChatResponse {
   fallback: boolean
   ops: Op[]
+}
+
+export interface ChatHistoryEntry {
+  id: string
+  ts: string
+  role: 'user' | 'assistant'
+  text?: string
+  fallback?: boolean
+  ops?: Op[]
+}
+
+export interface EventEntry {
+  id: string
+  ts: string
+  actor: 'user' | 'llm'
+  kind: 'mutation' | 'undo'
+  op: string | null
+  file: string
+  title: string
+  confirmation: 'none' | 'confirmed'
+  undoes: string | null
 }
 
 export interface ReviewData {

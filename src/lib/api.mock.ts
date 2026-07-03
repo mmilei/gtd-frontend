@@ -1,6 +1,6 @@
 // In-memory GTD state for demo/GitHub Pages deployment.
 // Substituted for ./api by the vite.config.ts alias when VITE_MOCK=true.
-import type { Bucket, BucketsMap, ChatResponse, Item, ProvidersResponse, ReviewData } from './types'
+import type { Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, ProvidersResponse, ReviewData } from './types'
 
 function todayStr(): string {
   // local date, not UTC — after 21:00 GMT-3 toISOString() would already say "tomorrow"
@@ -175,6 +175,32 @@ export async function getReview(_params: Record<string, string> = {}): Promise<R
 
 export async function undo(): Promise<{ undone: boolean }> {
   return { undone: false }
+}
+
+// No durable log in demo mode — chat history and the event log are session-only concepts here.
+export async function confirmChatOp(body: {
+  target_file: string
+  op: string
+  proposed_body?: string
+  chat_ref?: string
+}): Promise<{ confirmed: boolean; file: string; op: string }> {
+  if (body.op === 'dismiss') takeItem(body.target_file)
+  else if (body.proposed_body !== undefined) await replaceBody(body.target_file, body.proposed_body)
+  return { confirmed: true, file: body.target_file, op: body.op }
+}
+
+export async function confirmItem(filename: string): Promise<{ confirmed: boolean; file: string }> {
+  const found = findItem(filename)
+  if (found) found.item.confirmed = true
+  return { confirmed: true, file: filename }
+}
+
+export async function getChatHistory(_limit = 50): Promise<ChatHistoryEntry[]> {
+  return []
+}
+
+export async function getEvents(_params: { limit?: number; actor?: string; op?: string } = {}): Promise<EventEntry[]> {
+  return []
 }
 
 export async function transcribe(_audioBlob: Blob): Promise<{ text: string }> {

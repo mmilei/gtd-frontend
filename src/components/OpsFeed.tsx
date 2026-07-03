@@ -4,7 +4,7 @@ import { BUCKET_META } from '../lib/bucketMeta'
 import type { Bucket, Op } from '../lib/types'
 
 export interface FeedEntry {
-  id: number
+  id: string
   text: string
   time: string
   status: 'pending' | 'done' | 'error'
@@ -18,12 +18,13 @@ export interface FeedEntry {
 interface Props {
   entries: FeedEntry[]
   onOpenItem: (file: string) => void
-  onConfirmOp: (entryId: number, opIndex: number, op: Op) => void
-  onCancelOp: (entryId: number, opIndex: number) => void
+  onConfirmOp: (entryId: string, opIndex: number, op: Op) => void
+  onCancelOp: (entryId: string, opIndex: number) => void
+  onReviewItem: (entryId: string, opIndex: number, op: Op) => void
 }
 
 /** Capture results feed: collapsed shows the latest capture, expanded shows the session history. */
-export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp }: Props) {
+export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp, onReviewItem }: Props) {
   const [expanded, setExpanded] = useState(false)
   if (entries.length === 0) return null
 
@@ -49,6 +50,7 @@ export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp }: Props)
               onOpenItem={onOpenItem}
               onConfirmOp={onConfirmOp}
               onCancelOp={onCancelOp}
+              onReviewItem={onReviewItem}
             />
           ))}
         </div>
@@ -57,11 +59,12 @@ export function OpsFeed({ entries, onOpenItem, onConfirmOp, onCancelOp }: Props)
   )
 }
 
-function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp }: {
+function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp, onReviewItem }: {
   entry: FeedEntry
   onOpenItem: (file: string) => void
-  onConfirmOp: (entryId: number, opIndex: number, op: Op) => void
-  onCancelOp: (entryId: number, opIndex: number) => void
+  onConfirmOp: (entryId: string, opIndex: number, op: Op) => void
+  onCancelOp: (entryId: string, opIndex: number) => void
+  onReviewItem: (entryId: string, opIndex: number, op: Op) => void
 }) {
   return (
     <div className="animate-fade-up">
@@ -92,6 +95,8 @@ function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp }: {
         entry.ops?.map((op, i) =>
           op.requires_confirmation && !entry.resolved?.[i] ? (
             <ConfirmCard key={i} op={op} onConfirm={() => onConfirmOp(entry.id, i, op)} onCancel={() => onCancelOp(entry.id, i)} />
+          ) : op.op === 'create' && op.confirmed === false && !entry.resolved?.[i] ? (
+            <ReviewCard key={i} op={op} onReview={() => onReviewItem(entry.id, i, op)} />
           ) : (
             <OpCard key={i} op={op} outcome={entry.resolved?.[i]} onOpenItem={onOpenItem} />
           ),
@@ -152,7 +157,7 @@ function ConfirmCard({ op, onConfirm, onCancel }: { op: Op; onConfirm: () => voi
     <div className="mb-1 rounded-card border border-waiting/40 bg-surface px-3 py-2.5">
       <div className="mb-2 text-[12px] text-ink">
         {isDismiss ? (
-          <>Discard <span className="text-discard">“{op.title ?? op.target_file}”</span>? This can’t be undone from the chat.</>
+          <>Discard <span className="text-discard">“{op.title ?? op.target_file}”</span>? You can undo this afterwards from the toast or <code>POST /api/undo</code>.</>
         ) : (
           <>Apply this edit to <span className="text-waiting">“{op.title ?? op.target_file}”</span>?</>
         )}
@@ -183,6 +188,23 @@ function ConfirmCard({ op, onConfirm, onCancel }: { op: Op; onConfirm: () => voi
           Cancel
         </button>
       </div>
+    </div>
+  )
+}
+
+/** Shown when create returns confirmed: false — the task is already filed, low classifier confidence just flags it for a quick look. */
+function ReviewCard({ op, onReview }: { op: Op; onReview: () => void }) {
+  return (
+    <div className="mb-1 flex items-center justify-between gap-2 rounded-card border border-waiting/40 bg-surface px-3 py-2.5">
+      <div className="min-w-0 text-[12px] text-ink">
+        Filed <span className="text-waiting">“{op.title ?? op.file}”</span> with low confidence — look right?
+      </div>
+      <button
+        onClick={onReview}
+        className="shrink-0 rounded-md bg-accent px-3 py-1 text-[12px] text-bg transition-opacity hover:opacity-90"
+      >
+        Looks good
+      </button>
     </div>
   )
 }
