@@ -3,8 +3,20 @@ import type { BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, Prov
 const BASE = '/api'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, init)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, init)
+  } catch {
+    throw new Error('Could not reach the server — is the Java server running on :8080?')
+  }
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`
+    try {
+      const body = await res.json()
+      if (typeof body?.message === 'string') message = body.message
+    } catch { /* non-JSON error body, keep HTTP fallback */ }
+    throw new Error(message)
+  }
   return res.json() as Promise<T>
 }
 

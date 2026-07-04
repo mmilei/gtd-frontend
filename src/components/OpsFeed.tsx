@@ -78,7 +78,7 @@ function FeedRow({ entry, onOpenItem, onConfirmOp, onCancelOp }: {
       {entry.status === 'error' && (
         <div className="flex items-center gap-2 rounded-card border border-discard/30 bg-discard/10 px-3 py-2 text-[12px] text-discard">
           <AlertTriangle size={13} />
-          {entry.error ?? 'Something went wrong'} — is the Java server running on :8080?
+          {entry.error ?? 'Something went wrong'}
         </div>
       )}
 
