@@ -40,6 +40,16 @@ export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onFocus 
     if (!ok) setLeaving(false)
   }
 
+  // Only open on Enter/Space when the card itself is focused — a descendant button's own
+  // keydown bubbles here too, and Check/Focus/Dismiss already handle their own activation.
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onOpen(item.file)
+    }
+  }
+
   const title = item.title ?? item.file
   const tags = (item.tags ?? []).filter(t => !SYSTEM_TAGS.has(t))
   const snippet = bodySnippet(item.body)
@@ -49,7 +59,11 @@ export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onFocus 
   return (
     <div
       onClick={() => onOpen(item.file)}
-      className={`group cursor-pointer rounded-card border border-line bg-surface px-4 py-3 transition-colors hover:border-line-strong ${
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open "${title}"`}
+      className={`group cursor-pointer rounded-card border border-line bg-surface px-4 py-3 transition-colors hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
         leaving ? 'animate-card-out' : 'animate-fade-up'
       }`}
     >

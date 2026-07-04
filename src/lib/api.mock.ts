@@ -1,6 +1,7 @@
 // In-memory GTD state for demo/GitHub Pages deployment.
 // Substituted for ./api by the vite.config.ts alias when VITE_MOCK=true.
 import type { Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, ProvidersResponse, ReviewData } from './types'
+import type * as RealApi from './api'
 
 function todayStr(): string {
   // local date, not UTC — after 21:00 GMT-3 toISOString() would already say "tomorrow"
@@ -228,3 +229,16 @@ export async function selectProvider(id: string): Promise<{ active: string }> {
 export async function ping(): Promise<boolean> {
   return true
 }
+
+// Structural contract check: the Vite alias in vite.config.ts swaps this whole module in for
+// ./api at build time, and nothing else imports both, so nothing else lets TypeScript catch a
+// drift between them. If this module's exports stop matching api.ts's shape, this assignment
+// fails to compile — instead of the drift only surfacing as a runtime "X is not a function"
+// crash under VITE_MOCK=true.
+const _contract: typeof RealApi = {
+  chat, getBuckets, getBucket, getToday, fetchItem, markDone, dismissItem,
+  moveItem, patchMeta, replaceBody, markdownifyItem, getReview, undo,
+  confirmChatOp, confirmItem, getChatHistory, getEvents, transcribe,
+  getProviders, selectProvider, ping,
+}
+void _contract

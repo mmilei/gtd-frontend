@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 interface Props {
   title: string
@@ -11,15 +11,44 @@ interface Props {
   wide?: boolean
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+
 /** The single surface pattern for modal flows (edit, triage, review). */
 export function Overlay({ title, onClose, children, headerExtra, wide = false }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusable = dialog.querySelectorAll<HTMLElement>(FOCUSABLE)
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      // Trap Tab inside the dialog — without this, Tab walks straight out into the
+      // still-interactive background (there's no portal here to inert it separately).
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+    return () => previouslyFocused?.focus()
+  }, [])
 
   return (
     <div
@@ -29,8 +58,10 @@ export function Overlay({ title, onClose, children, headerExtra, wide = false }:
       }}
     >
       <div
+        ref={dialogRef}
         className={`flex max-h-[84vh] w-full ${wide ? 'max-w-2xl' : 'max-w-xl'} animate-fade-up flex-col overflow-hidden rounded-card border border-line bg-surface shadow-2xl`}
         role="dialog"
+        aria-modal="true"
         aria-label={title}
       >
         <div className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3">
