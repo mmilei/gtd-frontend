@@ -13,7 +13,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let message = `HTTP ${res.status}`
     try {
       const body = await res.json()
+      // LLM provider errors carry "message"; validation errors carry "error"
       if (typeof body?.message === 'string') message = body.message
+      else if (typeof body?.error === 'string') message = body.error
     } catch { /* non-JSON error body, keep HTTP fallback */ }
     throw new Error(message)
   }
