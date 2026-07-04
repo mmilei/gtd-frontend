@@ -21,7 +21,13 @@ export function AmbientScene() {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (media.matches) return
 
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
+    let renderer: THREE.WebGLRenderer
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
+    } catch {
+      // Purely decorative — a GPU/WebGL failure here shouldn't take the whole app down.
+      return
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setClearColor(0x000000, 0)
 

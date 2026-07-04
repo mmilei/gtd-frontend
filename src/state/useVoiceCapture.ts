@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { transcribe } from '../lib/api'
 
 export type MicState = 'idle' | 'recording' | 'transcribing'
@@ -14,6 +14,7 @@ export function useVoiceCapture({ onText, onError }: Options) {
   const [micState, setMicState] = useState<MicState>('idle')
   const recorder = useRef<MediaRecorder | null>(null)
   const recognition = useRef<SpeechRecognition | null>(null)
+  const stream = useRef<MediaStream | null>(null)
   const chunks = useRef<Blob[]>([])
   const pendingSend = useRef<((finalText?: string) => void) | null>(null)
 
@@ -27,15 +28,24 @@ export function useVoiceCapture({ onText, onError }: Options) {
 
   const start = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.current = mediaStream
       chunks.current = []
-      const rec = new MediaRecorder(stream)
+      let rec: MediaRecorder
+      try {
+        rec = new MediaRecorder(mediaStream)
+      } catch (err) {
+        mediaStream.getTracks().forEach(t => t.stop())
+        stream.current = null
+        throw err
+      }
       recorder.current = rec
       rec.ondataavailable = e => {
         if (e.data.size > 0) chunks.current.push(e.data)
       }
       rec.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop())
+        mediaStream.getTracks().forEach(t => t.stop())
+        stream.current = null
         setMicState('transcribing')
         let finalText: string | undefined
         try {
@@ -80,6 +90,20 @@ export function useVoiceCapture({ onText, onError }: Options) {
       onError('Could not access microphone.')
     }
   }, [onText, onError])
+
+  // Release the mic/recognizer/recorder on unmount — `stop()` alone only covers the
+  // explicit user-initiated path; MediaRecorder.onstop never fires if the component
+  // unmounts mid-recording, which otherwise leaves the browser's mic indicator lit.
+  useEffect(() => {
+    return () => {
+      recognition.current?.stop()
+      recognition.current = null
+      recorder.current?.stop()
+      recorder.current = null
+      stream.current?.getTracks().forEach(t => t.stop())
+      stream.current = null
+    }
+  }, [])
 
   return { micState, start, stop }
 }
