@@ -108,12 +108,3 @@ export function getProviders(): Promise<ProvidersResponse> {
 export function selectProvider(id: string): Promise<{ active: string }> {
   return request('/providers/select', json({ provider: id }))
 }
-
-export async function ping(): Promise<boolean> {
-  try {
-    const res = await fetch(`${BASE}/buckets`, { signal: AbortSignal.timeout(3000) })
-    return res.ok
-  } catch {
-    return false
-  }
-}
