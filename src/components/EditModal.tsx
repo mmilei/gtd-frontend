@@ -23,6 +23,13 @@ const normDate = (v?: string | null) => (v ? v.slice(0, 10) : '')
 /** Textareas normalize CRLF to LF, so vault bodies with \r\n would read as dirty otherwise. */
 const normBody = (s?: string | null) => (s ?? '').replace(/\r\n?/g, '\n')
 
+/** Order-insensitive set equality — shared by `dirty` and `save` so their field comparisons can't drift apart. */
+const sameSet = (a: string[], b: string[]) =>
+  JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())
+
+/** Same rounding `save` applies before persisting, so `dirty` doesn't flag e.g. "30.4" as changed when it would save as the already-current 30. */
+const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
+
 export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
   const [original, setOriginal] = useState<Item | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -68,18 +75,16 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
 
   const dirty = useMemo(() => {
     if (!original) return false
-    const same = (a: string[], b: string[]) =>
-      JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())
     return (
       title !== (original.title ?? file) ||
       body !== normBody(original.body) ||
       bucket !== (original.bucket ?? null) ||
-      !same(tags, original.tags ?? []) ||
-      !same(people, original.delegado_a ?? []) ||
+      !sameSet(tags, original.tags ?? []) ||
+      !sameSet(people, original.delegado_a ?? []) ||
       (due || null) !== (normDate(original.due) || null) ||
       (todaySince || null) !== (normDate(original.today_since) || null) ||
       (area || null) !== (original.area ?? null) ||
-      (estimate ? Number(estimate) : null) !== (original.estimate_minutes ?? null)
+      normEstimate(estimate) !== (original.estimate_minutes ?? null)
     )
   }, [original, file, title, body, bucket, tags, people, due, todaySince, area, estimate])
 
@@ -119,7 +124,7 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
       const nextTags = tags.includes('gtd') ? tags : ['gtd', ...tags]
       const meta: Partial<Item> = {}
       if (title && title !== (original.title ?? file)) meta.title = title
-      if (JSON.stringify([...nextTags].sort()) !== JSON.stringify([...(original.tags ?? [])].sort())) meta.tags = nextTags
+      if (!sameSet(nextTags, original.tags ?? [])) meta.tags = nextTags
       if ((due || null) !== (normDate(original.due) || null)) meta.due = due || null
       if (bucket === 'today' && !original.today_since && !todaySince) {
         const d = new Date()
@@ -127,9 +132,9 @@ export function EditModal({ file, tagSuggestions, onClose, onSaved }: Props) {
       } else if ((todaySince || null) !== (normDate(original.today_since) || null)) {
         meta.today_since = todaySince || null
       }
-      if (JSON.stringify([...people].sort()) !== JSON.stringify([...(original.delegado_a ?? [])].sort())) meta.delegado_a = people
+      if (!sameSet(people, original.delegado_a ?? [])) meta.delegado_a = people
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
-      const estimateNum = estimate ? Math.max(1, Math.round(Number(estimate))) : null
+      const estimateNum = normEstimate(estimate)
       if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
       // A manual save is itself a confirmation — with or without other edits — so a task the
       // classifier filed with low confidence (confirmed: false) never needs a separate review step.

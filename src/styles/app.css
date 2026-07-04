@@ -33,7 +33,10 @@
 
   --radius-card: 10px;
 
-  --animate-card-out: card-out 0.28s ease-in forwards;
+  /* Single source of truth for the exit-animation length — useBuckets reads this instead of
+     hardcoding a matching duration, so the two can't silently drift apart. */
+  --duration-card-out: 280ms;
+  --animate-card-out: card-out var(--duration-card-out) ease-in forwards;
   --animate-fade-up: fade-up 0.2s ease-out;
 
   @keyframes card-out {

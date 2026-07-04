@@ -4,8 +4,17 @@ import type { Bucket, BucketsMap, Item } from '../lib/types'
 
 const EMPTY: BucketsMap = { today: [], backlog: [], waiting: [], someday: [], reference: [] }
 
-/** Matches --animate-card-out in app.css so items finish leaving before the state drops them. */
-const EXIT_ANIMATION_MS = 280
+const FALLBACK_EXIT_ANIMATION_MS = 280
+
+/**
+ * Reads --duration-card-out (app.css) instead of hardcoding a matching literal here — the two
+ * can't silently drift apart. Falls back if the custom property is ever missing/unparsable.
+ */
+function exitAnimationMs(): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--duration-card-out').trim()
+  const ms = raw.endsWith('ms') ? parseFloat(raw) : parseFloat(raw) * 1000
+  return Number.isFinite(ms) ? ms : FALLBACK_EXIT_ANIMATION_MS
+}
 
 export type ApiStatus = 'connecting' | 'online' | 'offline'
 
@@ -52,7 +61,7 @@ export function useBuckets(): BucketsState {
   const withOptimisticRemove = useCallback(
     async (item: Item, action: () => Promise<unknown>): Promise<boolean> => {
       try {
-        await Promise.all([action(), new Promise(r => setTimeout(r, EXIT_ANIMATION_MS))])
+        await Promise.all([action(), new Promise(r => setTimeout(r, exitAnimationMs()))])
         if (!alive.current) return true
         setBuckets(prev => {
           const next = { ...prev }

@@ -226,10 +226,6 @@ export async function selectProvider(id: string): Promise<{ active: string }> {
   return { active: activeProvider }
 }
 
-export async function ping(): Promise<boolean> {
-  return true
-}
-
 // Structural contract check: the Vite alias in vite.config.ts swaps this whole module in for
 // ./api at build time, and nothing else imports both, so nothing else lets TypeScript catch a
 // drift between them. If this module's exports stop matching api.ts's shape, this assignment
@@ -239,6 +235,6 @@ const _contract: typeof RealApi = {
   chat, getBuckets, getBucket, getToday, fetchItem, markDone, dismissItem,
   moveItem, patchMeta, replaceBody, markdownifyItem, getReview, undo,
   confirmChatOp, confirmItem, getChatHistory, getEvents, transcribe,
-  getProviders, selectProvider, ping,
+  getProviders, selectProvider,
 }
 void _contract
