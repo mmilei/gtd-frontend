@@ -10,13 +10,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error('Could not reach the server — is the Java server running on :8080?')
   }
   if (!res.ok) {
-    let message = `HTTP ${res.status}`
+    let message: string
     try {
       const body = await res.json()
       // LLM provider errors carry "message"; validation errors carry "error"
       if (typeof body?.message === 'string') message = body.message
       else if (typeof body?.error === 'string') message = body.error
-    } catch { /* non-JSON error body, keep HTTP fallback */ }
+      else message = `HTTP ${res.status}`
+    } catch {
+      // Backend errors always come back as JSON (GlobalExceptionHandler). A non-JSON
+      // body means this response came from the dev proxy/infra, not the app — e.g.
+      // Vite's proxy answers with a plain-text 500 when :8080 is unreachable.
+      message = 'Could not reach the server — is the Java server running on :8080?'
+    }
     throw new Error(message)
   }
   return res.json() as Promise<T>
