@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BucketRail } from './components/BucketRail'
 import { CaptureBar } from './components/CaptureBar'
 import { EditModal } from './components/EditModal'
@@ -63,6 +63,9 @@ export default function App() {
   const [editingFile, setEditingFile] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [facetView, setFacetView] = useState<{ facet: Facet; value: string } | null>(null)
+  // Remembers the facet view an item was opened from, so closing EditModal can return to it
+  // instead of dropping the user back to the plain bucket list.
+  const returnToFacetRef = useRef<{ facet: Facet; value: string } | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -279,7 +282,13 @@ export default function App() {
           file={editingFile}
           tagSuggestions={tagSuggestions}
           projectSuggestions={projectSuggestions}
-          onClose={() => setEditingFile(null)}
+          onClose={() => {
+            setEditingFile(null)
+            if (returnToFacetRef.current) {
+              setFacetView(returnToFacetRef.current)
+              returnToFacetRef.current = null
+            }
+          }}
           onSaved={() => void refresh()}
         />
       )}
@@ -292,6 +301,7 @@ export default function App() {
           value={facetView.value}
           buckets={buckets}
           onOpenItem={file => {
+            returnToFacetRef.current = facetView
             setFacetView(null)
             setEditingFile(file)
           }}
