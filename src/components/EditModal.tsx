@@ -126,10 +126,9 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       }
       if (body !== normBody(original.body)) await replaceBody(file, body)
 
-      const nextTags = tags.includes('gtd') ? tags : ['gtd', ...tags]
       const meta: Partial<Item> = {}
       if (title && title !== (original.title ?? file)) meta.title = title
-      if (!sameSet(nextTags, original.tags ?? [])) meta.tags = nextTags
+      if (!sameSet(tags, original.tags ?? [])) meta.tags = tags
       if ((due || null) !== (normDate(original.due) || null)) meta.due = due || null
       if (bucket === 'today' && !original.today_since && !todaySince) {
         const d = new Date()
@@ -148,7 +147,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags: nextTags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject })
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()

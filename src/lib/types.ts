@@ -90,4 +90,4 @@ export interface ProvidersResponse {
 }
 
 /** System tags never shown as user-facing context tags. */
-export const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
+export const SYSTEM_TAGS = new Set(['reference', 'project'])
