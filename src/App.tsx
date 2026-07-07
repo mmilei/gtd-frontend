@@ -8,6 +8,7 @@ import { ItemList } from './components/ItemList'
 import { OpsFeed } from './components/OpsFeed'
 import type { FeedEntry } from './components/OpsFeed'
 import { ReviewOverlay } from './components/ReviewOverlay'
+import { SearchOverlay } from './components/SearchOverlay'
 import { TriageOverlay } from './components/TriageOverlay'
 import { UndoToast, useUndoToast } from './components/UndoToast'
 import { AmbientScene } from './components/AmbientScene'
@@ -59,6 +60,7 @@ export default function App() {
   const [feed, setFeed] = useState<FeedEntry[]>([])
   const [capturing, setCapturing] = useState(false)
   const [editingFile, setEditingFile] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [triageOpen, setTriageOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -74,6 +76,18 @@ export default function App() {
       .catch(() => {
         // no transcript yet (fresh vault) or backend unavailable — starting empty is fine
       })
+  }, [])
+
+  // Ctrl/Cmd+K toggles the global search overlay (Overlay itself handles Escape-to-close).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   function selectBucket(next: Bucket) {
@@ -222,6 +236,7 @@ export default function App() {
       )}
       <Header
         apiStatus={apiStatus}
+        onOpenSearch={() => setSearchOpen(true)}
         onOpenTriage={() => setTriageOpen(true)}
         onOpenReview={() => setReviewOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
@@ -258,6 +273,9 @@ export default function App() {
           onClose={() => setEditingFile(null)}
           onSaved={() => void refresh()}
         />
+      )}
+      {searchOpen && (
+        <SearchOverlay buckets={buckets} onOpenItem={setEditingFile} onClose={() => setSearchOpen(false)} />
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
       {reviewOpen && <ReviewOverlay onClose={() => setReviewOpen(false)} onChanged={() => void refresh()} />}
