@@ -24,6 +24,12 @@ function itemMatches(item: Item, facet: Facet, value: string): boolean {
       // Trim to match how projectSuggestions (the source of `value`) is derived — a backend-set
       // project with stray whitespace must still land in its own facet.
       return (item.project?.trim() ?? '') === value
+    default: {
+      // Compile-time guard: adding a Facet member without a matching case above is a type error
+      // here, instead of a silent runtime "matches nothing".
+      const _exhaustive: never = facet
+      return _exhaustive
+    }
   }
 }
 
