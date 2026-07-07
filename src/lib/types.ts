@@ -11,6 +11,7 @@ export interface Item {
   today_since?: string | null
   delegado_a?: string[]
   area?: string | null
+  project?: string | null
   markdownified?: boolean
   estimate_minutes?: number | null
   /** false = classifier used the low-confidence fallback prompt, pending review. Absent/true/null = confirmed. */

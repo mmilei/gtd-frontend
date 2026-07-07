@@ -122,6 +122,18 @@ export default function App() {
     return [...all].sort()
   }, [buckets])
 
+  // Distinct non-blank project values across all buckets — same client-side aggregation as tags.
+  const projectSuggestions = useMemo(() => {
+    const all = new Set<string>()
+    for (const items of Object.values(buckets)) {
+      for (const item of items) {
+        const p = item.project?.trim()
+        if (p) all.add(p)
+      }
+    }
+    return [...all].sort()
+  }, [buckets])
+
   // ── Capture ────────────────────────────────────────────────
   const sendCapture = useCallback(
     async (text: string) => {
@@ -242,6 +254,7 @@ export default function App() {
         <EditModal
           file={editingFile}
           tagSuggestions={tagSuggestions}
+          projectSuggestions={projectSuggestions}
           onClose={() => setEditingFile(null)}
           onSaved={() => void refresh()}
         />
