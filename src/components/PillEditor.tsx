@@ -45,7 +45,11 @@ export function PillEditor({ values, placeholder, suggestions, normalize, onAdd,
             commit()
           } else if (e.key === 'Backspace' && draft === '' && values.length > 0) {
             onRemove(values[values.length - 1])
-          } else if (e.key === 'Escape') {
+          } else if (e.key === 'Escape' && draft !== '') {
+            // Only consume Escape when there's a draft to clear — first Escape cancels the
+            // in-progress pill, second Escape (now with an empty draft) bubbles up to Overlay
+            // and closes the modal. An empty draft has nothing to clear, so let it bubble
+            // immediately instead of eating the modal's close on the first press.
             e.stopPropagation()
             setDraft('')
           }
