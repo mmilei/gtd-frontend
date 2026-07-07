@@ -20,6 +20,9 @@ export interface Item {
 
 export type BucketsMap = Record<Bucket, Item[]>
 
+/** Dimension a cross-bucket FacetView groups by. Open union — 'location' etc. can join once the field exists. */
+export type Facet = 'tag' | 'project'
+
 export interface Op {
   op: string
   bucket?: Bucket | 'now' | 'discard'

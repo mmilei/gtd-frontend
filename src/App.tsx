@@ -7,6 +7,7 @@ import { HistoryPanel } from './components/HistoryPanel'
 import { ItemList } from './components/ItemList'
 import { OpsFeed } from './components/OpsFeed'
 import type { FeedEntry } from './components/OpsFeed'
+import { FacetView } from './components/FacetView'
 import { ReviewOverlay } from './components/ReviewOverlay'
 import { SearchOverlay } from './components/SearchOverlay'
 import { TriageOverlay } from './components/TriageOverlay'
@@ -17,7 +18,7 @@ import { chat, confirmChatOp, getChatHistory } from './lib/api'
 import { celebrate } from './lib/celebration'
 import { orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
-import type { Bucket, ChatHistoryEntry, Item, Op } from './lib/types'
+import type { Bucket, ChatHistoryEntry, Facet, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
 
 const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
@@ -61,6 +62,7 @@ export default function App() {
   const [capturing, setCapturing] = useState(false)
   const [editingFile, setEditingFile] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [facetView, setFacetView] = useState<{ facet: Facet; value: string } | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -242,7 +244,13 @@ export default function App() {
         onOpenHistory={() => setHistoryOpen(true)}
       />
       <div className="flex min-h-0 flex-1">
-        <BucketRail buckets={buckets} active={bucket} onSelect={selectBucket} />
+        <BucketRail
+          buckets={buckets}
+          active={bucket}
+          onSelect={selectBucket}
+          projects={projectSuggestions}
+          onOpenProject={value => setFacetView({ facet: 'project', value })}
+        />
         <main className="flex min-w-0 flex-1 flex-col">
           <ItemList
             bucket={bucket}
@@ -250,6 +258,7 @@ export default function App() {
             allItems={bucketItems}
             selectedTags={selectedTags}
             onToggleTag={toggleTag}
+            onViewTagAcross={value => setFacetView({ facet: 'tag', value })}
             onOpenItem={setEditingFile}
             onComplete={complete}
             onDismiss={remove}
@@ -276,6 +285,20 @@ export default function App() {
       )}
       {searchOpen && (
         <SearchOverlay buckets={buckets} onOpenItem={setEditingFile} onClose={() => setSearchOpen(false)} />
+      )}
+      {facetView && (
+        <FacetView
+          facet={facetView.facet}
+          value={facetView.value}
+          buckets={buckets}
+          onOpenItem={file => {
+            setFacetView(null)
+            setEditingFile(file)
+          }}
+          onComplete={complete}
+          onDismiss={remove}
+          onClose={() => setFacetView(null)}
+        />
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
       {reviewOpen && <ReviewOverlay onClose={() => setReviewOpen(false)} onChanged={() => void refresh()} />}
