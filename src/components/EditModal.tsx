@@ -11,6 +11,7 @@ interface Props {
   file: string
   tagSuggestions: string[]
   projectSuggestions: string[]
+  locationSuggestions: string[]
   onClose: () => void
   onSaved: () => void
 }
@@ -31,7 +32,7 @@ const sameSet = (a: string[], b: string[]) =>
 /** Same rounding `save` applies before persisting, so `dirty` doesn't flag e.g. "30.4" as changed when it would save as the already-current 30. */
 const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
 
-export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, onSaved }: Props) {
+export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, onClose, onSaved }: Props) {
   const [original, setOriginal] = useState<Item | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
 
@@ -44,6 +45,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
   const [todaySince, setTodaySince] = useState('')
   const [area, setArea] = useState('')
   const [project, setProject] = useState('')
+  const [location, setLocation] = useState('')
   const [estimate, setEstimate] = useState('')
 
   const [saving, setSaving] = useState(false)
@@ -66,6 +68,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
         setTodaySince(normDate(item.today_since))
         setArea(item.area ?? '')
         setProject(item.project ?? '')
+        setLocation(item.location ?? '')
         setEstimate(item.estimate_minutes != null ? String(item.estimate_minutes) : '')
       })
       .catch(() => !cancelled && setLoadFailed(true))
@@ -88,9 +91,10 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       (todaySince || null) !== (normDate(original.today_since) || null) ||
       (area || null) !== (original.area ?? null) ||
       (project.trim() || null) !== (original.project ?? null) ||
+      (location.trim() || null) !== (original.location ?? null) ||
       normEstimate(estimate) !== (original.estimate_minutes ?? null)
     )
-  }, [original, file, title, body, bucket, tags, people, due, todaySince, area, project, estimate])
+  }, [original, file, title, body, bucket, tags, people, due, todaySince, area, project, location, estimate])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -113,6 +117,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
     setTodaySince(normDate(original.today_since))
     setArea(original.area ?? '')
     setProject(original.project ?? '')
+    setLocation(original.location ?? '')
     setEstimate(original.estimate_minutes != null ? String(original.estimate_minutes) : '')
   }
 
@@ -140,6 +145,8 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
       const nextProject = project.trim() || null
       if (nextProject !== (original.project ?? null)) meta.project = nextProject
+      const nextLocation = location.trim() || null
+      if (nextLocation !== (original.location ?? null)) meta.location = nextLocation
       const estimateNum = normEstimate(estimate)
       if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
       // A manual save is itself a confirmation — with or without other edits — so a task the
@@ -147,7 +154,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject })
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject, location: nextLocation })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
@@ -238,6 +245,22 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
             <datalist id="edit-project-suggestions">
               {projectSuggestions.map(p => (
                 <option key={p} value={p} />
+              ))}
+            </datalist>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Location</span>
+            <input
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              list="edit-location-suggestions"
+              placeholder="e.g. ferretería"
+              spellCheck={false}
+              className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
+            />
+            <datalist id="edit-location-suggestions">
+              {locationSuggestions.map(l => (
+                <option key={l} value={l} />
               ))}
             </datalist>
           </label>

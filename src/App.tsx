@@ -153,6 +153,18 @@ export default function App() {
     return [...all].sort()
   }, [buckets])
 
+  // Distinct non-blank location values across all buckets — same client-side aggregation as projects.
+  const locationSuggestions = useMemo(() => {
+    const all = new Set<string>()
+    for (const items of Object.values(buckets)) {
+      for (const item of items) {
+        const l = item.location?.trim()
+        if (l) all.add(l)
+      }
+    }
+    return [...all].sort()
+  }, [buckets])
+
   // ── Capture ────────────────────────────────────────────────
   const sendCapture = useCallback(
     async (text: string) => {
@@ -282,6 +294,7 @@ export default function App() {
           file={editingFile}
           tagSuggestions={tagSuggestions}
           projectSuggestions={projectSuggestions}
+          locationSuggestions={locationSuggestions}
           onClose={() => {
             setEditingFile(null)
             if (returnToFacetRef.current) {
