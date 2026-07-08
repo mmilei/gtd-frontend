@@ -2,7 +2,7 @@ import { Check, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
-import { SYSTEM_TAGS } from '../lib/types'
+import { AREA_OPTIONS, SYSTEM_TAGS } from '../lib/types'
 import type { Bucket, Item } from '../lib/types'
 import { Overlay } from './Overlay'
 import { PillEditor } from './PillEditor'
@@ -265,6 +265,21 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
             </datalist>
           </label>
           <label className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Area</span>
+            <select
+              value={area}
+              onChange={e => setArea(e.target.value)}
+              className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink focus:border-accent/60 focus:outline-none"
+            >
+              <option value="">—</option>
+              {AREA_OPTIONS.map(a => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5">
             <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Due date</span>
             <input
               type="date"
@@ -295,17 +310,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
                 value={todaySince}
                 onChange={e => setTodaySince(e.target.value)}
                 className="rounded-card border border-line bg-bg px-3 py-1.5 font-mono text-[12px] text-ink focus:border-accent/60 focus:outline-none [color-scheme:dark]"
-              />
-            </label>
-          )}
-          {bucket === 'reference' && (
-            <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Area</span>
-              <input
-                value={area}
-                onChange={e => setArea(e.target.value)}
-                placeholder="e.g. work, health, finance"
-                className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink focus:border-accent/60 focus:outline-none"
               />
             </label>
           )}

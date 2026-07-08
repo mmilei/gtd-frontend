@@ -18,10 +18,11 @@ function makeFilename(title: string): string {
 const state: Record<Bucket, Item[]> = {
   today: [
     { file: '20260628-090000-review-team-pull-request.md', bucket: 'today', title: 'Review team pull request', due: todayStr(), tags: ['work', 'code'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 45, project: 'gtd-frontend' },
-    { file: '20260628-095500-call-the-dentist.md', bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['health'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 10 },
+    { file: '20260628-095500-call-the-dentist.md', bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['health'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 10, area: 'salud' },
   ],
   backlog: [
-    { file: '20260627-150000-write-project-readme.md', bucket: 'backlog', title: 'Write project README', tags: ['work'], body: '', created: '2026-06-27', project: 'gtd-frontend' },
+    { file: '20260627-150000-write-project-readme.md', bucket: 'backlog', title: 'Write project README', tags: ['work'], body: '', created: '2026-06-27', project: 'gtd-frontend', area: 'trabajo' },
+    { file: '20260627-160000-buy-hardware-supplies.md', bucket: 'backlog', title: 'Buy screws and wall plugs', tags: ['shopping'], body: '', created: '2026-06-27', location: 'ferretería', area: 'hogar' },
   ],
   waiting: [
     { file: '20260625-110000-wait-for-design-team.md', bucket: 'waiting', title: 'Wait for design team response', delegado_a: ['design team'], tags: [], body: '', created: '2026-06-25', project: 'java-gtd' },

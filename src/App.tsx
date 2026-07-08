@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AreaBar } from './components/AreaBar'
 import { BucketRail } from './components/BucketRail'
 import { CaptureBar } from './components/CaptureBar'
 import { EditModal } from './components/EditModal'
@@ -267,6 +268,7 @@ export default function App() {
           onOpenProject={value => setFacetView({ facet: 'project', value })}
         />
         <main className="flex min-w-0 flex-1 flex-col">
+          <AreaBar onOpenArea={value => setFacetView({ facet: 'area', value })} />
           <ItemList
             bucket={bucket}
             items={visibleItems}

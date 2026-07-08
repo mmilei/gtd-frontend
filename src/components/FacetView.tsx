@@ -26,6 +26,8 @@ function itemMatches(item: Item, facet: Facet, value: string): boolean {
       return (item.project?.trim() ?? '') === value
     case 'location':
       return (item.location?.trim() ?? '') === value
+    case 'area':
+      return (item.area?.trim() ?? '') === value
     default: {
       // Compile-time guard: adding a Facet member without a matching case above is a type error
       // here, instead of a silent runtime "matches nothing".
@@ -35,7 +37,7 @@ function itemMatches(item: Item, facet: Facet, value: string): boolean {
   }
 }
 
-const FACET_PREFIX: Record<Facet, string> = { tag: '#', project: '◆ ', location: '📍 ' }
+const FACET_PREFIX: Record<Facet, string> = { tag: '#', project: '◆ ', location: '📍 ', area: '▣ ' }
 
 /** One reusable cross-bucket view: everything matching facet+value, grouped by bucket. */
 export function FacetView({ facet, value, buckets, onOpenItem, onComplete, onDismiss, onClose }: Props) {
