@@ -10,6 +10,8 @@ interface Props {
   value: string
   buckets: BucketsMap
   onOpenItem: (file: string) => void
+  onOpenProject: (project: string) => void
+  onOpenLocation: (location: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
   onClose: () => void
@@ -40,7 +42,7 @@ function itemMatches(item: Item, facet: Facet, value: string): boolean {
 const FACET_PREFIX: Record<Facet, string> = { tag: '#', project: '◆ ', location: '📍 ', area: '▣ ' }
 
 /** One reusable cross-bucket view: everything matching facet+value, grouped by bucket. */
-export function FacetView({ facet, value, buckets, onOpenItem, onComplete, onDismiss, onClose }: Props) {
+export function FacetView({ facet, value, buckets, onOpenItem, onOpenProject, onOpenLocation, onComplete, onDismiss, onClose }: Props) {
   const groups = useMemo(
     () =>
       BUCKET_ORDER.map(bucket => ({
@@ -69,6 +71,8 @@ export function FacetView({ facet, value, buckets, onOpenItem, onComplete, onDis
                   item={item}
                   bucket={bucket}
                   onOpen={onOpenItem}
+                  onOpenProject={onOpenProject}
+                  onOpenLocation={onOpenLocation}
                   onComplete={onComplete}
                   onDismiss={onDismiss}
                 />

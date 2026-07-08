@@ -9,6 +9,9 @@ interface Props {
   item: Item
   bucket: Bucket
   onOpen: (file: string) => void
+  /** Open the cross-bucket facet view for this item's project / location. */
+  onOpenProject?: (project: string) => void
+  onOpenLocation?: (location: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
   /** Present only in Today — starts a focus session on this item. */
@@ -29,7 +32,7 @@ function daysInToday(item: Item, bucket: Bucket): number {
   return Math.floor((Date.now() - new Date(item.today_since).getTime()) / 86_400_000)
 }
 
-export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onFocus }: Props) {
+export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, onComplete, onDismiss, onFocus }: Props) {
   const [leaving, setLeaving] = useState(false)
 
   async function run(e: React.MouseEvent, action: (i: Item) => Promise<boolean>, sound = false) {
@@ -55,6 +58,8 @@ export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onFocus 
   const snippet = bodySnippet(item.body)
   const age = daysInToday(item, bucket)
   const people = item.delegado_a ?? []
+  const project = item.project?.trim()
+  const location = item.location?.trim()
 
   return (
     <div
@@ -79,6 +84,36 @@ export function ItemCard({ item, bucket, onOpen, onComplete, onDismiss, onFocus 
 
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13.5px] leading-snug text-ink">{title}</div>
+          {(project || location) && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {project && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    onOpenProject?.(project)
+                  }}
+                  disabled={!onOpenProject}
+                  title={`View project ${project}`}
+                  className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[10.5px] text-accent transition-colors enabled:hover:border-accent/60 disabled:cursor-default"
+                >
+                  ◆ {project}
+                </button>
+              )}
+              {location && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    onOpenLocation?.(location)
+                  }}
+                  disabled={!onOpenLocation}
+                  title={`View location ${location}`}
+                  className="rounded-full border border-today/30 bg-today/10 px-2 py-0.5 text-[10.5px] text-today transition-colors enabled:hover:border-today/60 disabled:cursor-default"
+                >
+                  📍 {location}
+                </button>
+              )}
+            </div>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] text-ink-faint">
             {item.created && <span>{item.created}</span>}
             {item.due && <span className="text-waiting">due {item.due}</span>}

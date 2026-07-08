@@ -277,6 +277,8 @@ export default function App() {
             onToggleTag={toggleTag}
             onViewTagAcross={value => setFacetView({ facet: 'tag', value })}
             onOpenItem={setEditingFile}
+            onOpenProject={value => setFacetView({ facet: 'project', value })}
+            onOpenLocation={value => setFacetView({ facet: 'location', value })}
             onComplete={complete}
             onDismiss={remove}
             onFocus={bucket === 'today' ? startFocus : undefined}
@@ -320,6 +322,8 @@ export default function App() {
             setFacetView(null)
             setEditingFile(file)
           }}
+          onOpenProject={value => setFacetView({ facet: 'project', value })}
+          onOpenLocation={value => setFacetView({ facet: 'location', value })}
           onComplete={complete}
           onDismiss={remove}
           onClose={() => setFacetView(null)}
