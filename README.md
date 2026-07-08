@@ -52,7 +52,7 @@ VITE_MOCK=true npm run dev
 
 The [live demo](https://mmilei.github.io/gtd-frontend) is this mock build, deployed to GitHub Pages on every push to `master`.
 
-Other scripts: `npm run build` (type-check + bundle) · `npm run typecheck` · `npm run preview`.
+Other scripts: `npm run build` (type-check + bundle) · `npm run typecheck` · `npm test` (Vitest + Testing Library) · `npm run preview`.
 
 ## Project structure
 
