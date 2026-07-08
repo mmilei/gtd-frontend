@@ -1,4 +1,4 @@
-import { CalendarCheck, History, Play } from 'lucide-react'
+import { CalendarCheck, History, Play, Search } from 'lucide-react'
 import type { ApiStatus } from '../state/useBuckets'
 import { ProviderMenu } from './ProviderMenu'
 
@@ -10,12 +10,13 @@ const TODAY_LABEL = new Date().toLocaleDateString('en-GB', {
 
 interface Props {
   apiStatus: ApiStatus
+  onOpenSearch: () => void
   onOpenTriage: () => void
   onOpenReview: () => void
   onOpenHistory: () => void
 }
 
-export function Header({ apiStatus, onOpenTriage, onOpenReview, onOpenHistory }: Props) {
+export function Header({ apiStatus, onOpenSearch, onOpenTriage, onOpenReview, onOpenHistory }: Props) {
   return (
     <header className="flex h-13 shrink-0 items-center justify-between border-b border-line bg-surface px-5">
       <div className="flex items-baseline gap-2.5">
@@ -23,6 +24,15 @@ export function Header({ apiStatus, onOpenTriage, onOpenReview, onOpenHistory }:
         <span className="font-mono text-[11px] text-ink-faint">{TODAY_LABEL}</span>
       </div>
       <div className="flex items-center gap-1.5">
+        <button
+          onClick={onOpenSearch}
+          title="Search all buckets"
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+        >
+          <Search size={13} />
+          Search
+          <kbd className="rounded border border-line px-1 font-mono text-[10px] text-ink-faint">⌘K</kbd>
+        </button>
         <button
           onClick={onOpenTriage}
           title="Triage backlog"

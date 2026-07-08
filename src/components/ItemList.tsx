@@ -12,6 +12,7 @@ interface Props {
   allItems: Item[]
   selectedTags: Set<string>
   onToggleTag: (tag: string, additive: boolean) => void
+  onViewTagAcross: (tag: string) => void
   onOpenItem: (file: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
@@ -19,7 +20,7 @@ interface Props {
   onFocus?: (item?: Item) => void
 }
 
-export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onOpenItem, onComplete, onDismiss, onFocus }: Props) {
+export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onViewTagAcross, onOpenItem, onComplete, onDismiss, onFocus }: Props) {
   const meta = BUCKET_META[bucket]
   const [query, setQuery] = useState('')
   const projection = bucket === 'today' ? projectDay(items) : null
@@ -73,7 +74,7 @@ export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, o
           </div>
         )}
 
-        <TagBar items={allItems} selected={selectedTags} onToggle={onToggleTag} />
+        <TagBar items={allItems} selected={selectedTags} onToggle={onToggleTag} onViewAcross={onViewTagAcross} />
 
         {visible.length === 0 ? (
           <div className="rounded-card border border-dashed border-line px-6 py-12 text-center text-[13px] text-ink-faint">

@@ -11,6 +11,7 @@ export interface Item {
   today_since?: string | null
   delegado_a?: string[]
   area?: string | null
+  project?: string | null
   markdownified?: boolean
   estimate_minutes?: number | null
   /** false = classifier used the low-confidence fallback prompt, pending review. Absent/true/null = confirmed. */
@@ -18,6 +19,9 @@ export interface Item {
 }
 
 export type BucketsMap = Record<Bucket, Item[]>
+
+/** Dimension a cross-bucket FacetView groups by. Open union — 'location' etc. can join once the field exists. */
+export type Facet = 'tag' | 'project'
 
 export interface Op {
   op: string
@@ -86,4 +90,4 @@ export interface ProvidersResponse {
 }
 
 /** System tags never shown as user-facing context tags. */
-export const SYSTEM_TAGS = new Set(['gtd', 'action', 'reference', 'project'])
+export const SYSTEM_TAGS = new Set(['reference', 'project'])

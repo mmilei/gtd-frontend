@@ -46,7 +46,13 @@ export function Overlay({ title, onClose, children, headerExtra, wide = false }:
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null
-    dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+    const dialog = dialogRef.current
+    // If a child already grabbed focus via autoFocus (e.g. a search input), don't
+    // override it with the first focusable element in DOM order (the close button,
+    // which always renders before the content).
+    if (dialog && !dialog.contains(document.activeElement)) {
+      dialog.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+    }
     return () => previouslyFocused?.focus()
   }, [])
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BucketRail } from './components/BucketRail'
 import { CaptureBar } from './components/CaptureBar'
 import { EditModal } from './components/EditModal'
@@ -7,7 +7,9 @@ import { HistoryPanel } from './components/HistoryPanel'
 import { ItemList } from './components/ItemList'
 import { OpsFeed } from './components/OpsFeed'
 import type { FeedEntry } from './components/OpsFeed'
+import { FacetView } from './components/FacetView'
 import { ReviewOverlay } from './components/ReviewOverlay'
+import { SearchOverlay } from './components/SearchOverlay'
 import { TriageOverlay } from './components/TriageOverlay'
 import { UndoToast, useUndoToast } from './components/UndoToast'
 import { AmbientScene } from './components/AmbientScene'
@@ -16,7 +18,7 @@ import { chat, confirmChatOp, getChatHistory } from './lib/api'
 import { celebrate } from './lib/celebration'
 import { orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
-import type { Bucket, ChatHistoryEntry, Item, Op } from './lib/types'
+import type { Bucket, ChatHistoryEntry, Facet, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
 
 const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
@@ -59,6 +61,11 @@ export default function App() {
   const [feed, setFeed] = useState<FeedEntry[]>([])
   const [capturing, setCapturing] = useState(false)
   const [editingFile, setEditingFile] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [facetView, setFacetView] = useState<{ facet: Facet; value: string } | null>(null)
+  // Remembers the facet view an item was opened from, so closing EditModal can return to it
+  // instead of dropping the user back to the plain bucket list.
+  const returnToFacetRef = useRef<{ facet: Facet; value: string } | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -74,6 +81,18 @@ export default function App() {
       .catch(() => {
         // no transcript yet (fresh vault) or backend unavailable — starting empty is fine
       })
+  }, [])
+
+  // Ctrl/Cmd+K toggles the global search overlay (Overlay itself handles Escape-to-close).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   function selectBucket(next: Bucket) {
@@ -117,6 +136,18 @@ export default function App() {
     for (const items of Object.values(buckets)) {
       for (const item of items) {
         for (const t of item.tags ?? []) if (!SYSTEM_TAGS.has(t)) all.add(t)
+      }
+    }
+    return [...all].sort()
+  }, [buckets])
+
+  // Distinct non-blank project values across all buckets — same client-side aggregation as tags.
+  const projectSuggestions = useMemo(() => {
+    const all = new Set<string>()
+    for (const items of Object.values(buckets)) {
+      for (const item of items) {
+        const p = item.project?.trim()
+        if (p) all.add(p)
       }
     }
     return [...all].sort()
@@ -210,12 +241,19 @@ export default function App() {
       )}
       <Header
         apiStatus={apiStatus}
+        onOpenSearch={() => setSearchOpen(true)}
         onOpenTriage={() => setTriageOpen(true)}
         onOpenReview={() => setReviewOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
       />
       <div className="flex min-h-0 flex-1">
-        <BucketRail buckets={buckets} active={bucket} onSelect={selectBucket} />
+        <BucketRail
+          buckets={buckets}
+          active={bucket}
+          onSelect={selectBucket}
+          projects={projectSuggestions}
+          onOpenProject={value => setFacetView({ facet: 'project', value })}
+        />
         <main className="flex min-w-0 flex-1 flex-col">
           <ItemList
             bucket={bucket}
@@ -223,6 +261,7 @@ export default function App() {
             allItems={bucketItems}
             selectedTags={selectedTags}
             onToggleTag={toggleTag}
+            onViewTagAcross={value => setFacetView({ facet: 'tag', value })}
             onOpenItem={setEditingFile}
             onComplete={complete}
             onDismiss={remove}
@@ -242,8 +281,33 @@ export default function App() {
         <EditModal
           file={editingFile}
           tagSuggestions={tagSuggestions}
-          onClose={() => setEditingFile(null)}
+          projectSuggestions={projectSuggestions}
+          onClose={() => {
+            setEditingFile(null)
+            if (returnToFacetRef.current) {
+              setFacetView(returnToFacetRef.current)
+              returnToFacetRef.current = null
+            }
+          }}
           onSaved={() => void refresh()}
+        />
+      )}
+      {searchOpen && (
+        <SearchOverlay buckets={buckets} onOpenItem={setEditingFile} onClose={() => setSearchOpen(false)} />
+      )}
+      {facetView && (
+        <FacetView
+          facet={facetView.facet}
+          value={facetView.value}
+          buckets={buckets}
+          onOpenItem={file => {
+            returnToFacetRef.current = facetView
+            setFacetView(null)
+            setEditingFile(file)
+          }}
+          onComplete={complete}
+          onDismiss={remove}
+          onClose={() => setFacetView(null)}
         />
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
