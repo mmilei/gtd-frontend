@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { BUCKET_ORDER } from '../lib/bucketMeta'
+import { itemMatches } from '../lib/facets'
 import type { BucketsMap, Facet, Item } from '../lib/types'
 import { BucketGroupHeader } from './BucketGroupHeader'
 import { ItemCard } from './ItemCard'
@@ -15,28 +16,6 @@ interface Props {
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
   onClose: () => void
-}
-
-/** How each facet decides whether an item belongs to `value`. New facets add one arm here. */
-function itemMatches(item: Item, facet: Facet, value: string): boolean {
-  switch (facet) {
-    case 'tag':
-      return (item.tags ?? []).includes(value)
-    case 'project':
-      // Trim to match how projectSuggestions (the source of `value`) is derived — a backend-set
-      // project with stray whitespace must still land in its own facet.
-      return (item.project?.trim() ?? '') === value
-    case 'location':
-      return (item.location?.trim() ?? '') === value
-    case 'area':
-      return (item.area?.trim() ?? '') === value
-    default: {
-      // Compile-time guard: adding a Facet member without a matching case above is a type error
-      // here, instead of a silent runtime "matches nothing".
-      const _exhaustive: never = facet
-      return _exhaustive
-    }
-  }
 }
 
 const FACET_PREFIX: Record<Facet, string> = { tag: '#', project: '◆ ', location: '📍 ', area: '▣ ' }
