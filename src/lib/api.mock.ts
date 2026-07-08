@@ -18,11 +18,11 @@ function makeFilename(title: string): string {
 const state: Record<Bucket, Item[]> = {
   today: [
     { file: '20260628-090000-review-team-pull-request.md', bucket: 'today', title: 'Review team pull request', due: todayStr(), tags: ['work', 'code'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 45, project: 'gtd-frontend' },
-    { file: '20260628-095500-call-the-dentist.md', bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['health'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 10, area: 'salud' },
+    { file: '20260628-095500-call-the-dentist.md', bucket: 'today', title: 'Call the dentist', due: todayStr(), tags: ['health'], body: '', created: '2026-06-28', today_since: '2026-06-28', estimate_minutes: 10, area: 'health' },
   ],
   backlog: [
-    { file: '20260627-150000-write-project-readme.md', bucket: 'backlog', title: 'Write project README', tags: ['work'], body: '', created: '2026-06-27', project: 'gtd-frontend', area: 'trabajo' },
-    { file: '20260627-160000-buy-hardware-supplies.md', bucket: 'backlog', title: 'Buy screws and wall plugs', tags: ['shopping'], body: '', created: '2026-06-27', location: 'ferretería', area: 'hogar' },
+    { file: '20260627-150000-write-project-readme.md', bucket: 'backlog', title: 'Write project README', tags: ['work'], body: '', created: '2026-06-27', project: 'gtd-frontend', area: 'work' },
+    { file: '20260627-160000-buy-hardware-supplies.md', bucket: 'backlog', title: 'Buy screws and wall plugs', tags: ['shopping'], body: '', created: '2026-06-27', location: 'hardware store', area: 'home' },
   ],
   waiting: [
     { file: '20260625-110000-wait-for-design-team.md', bucket: 'waiting', title: 'Wait for design team response', delegado_a: ['design team'], tags: [], body: '', created: '2026-06-25', project: 'java-gtd' },
@@ -107,6 +107,11 @@ export async function getBucket(bucket: string): Promise<Item[]> {
 
 export function getToday(): Promise<Item[]> {
   return getBucket('today')
+}
+
+// Mirrors the backend's committed gtd.areas default.
+export async function getAreas(): Promise<string[]> {
+  return ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 }
 
 export async function fetchItem(filename: string): Promise<Item> {
@@ -233,7 +238,7 @@ export async function selectProvider(id: string): Promise<{ active: string }> {
 // fails to compile — instead of the drift only surfacing as a runtime "X is not a function"
 // crash under VITE_MOCK=true.
 const _contract: typeof RealApi = {
-  chat, getBuckets, getBucket, getToday, fetchItem, markDone, dismissItem,
+  chat, getBuckets, getBucket, getToday, getAreas, fetchItem, markDone, dismissItem,
   moveItem, patchMeta, replaceBody, markdownifyItem, getReview, undo,
   confirmChatOp, confirmItem, getChatHistory, getEvents, transcribe,
   getProviders, selectProvider,

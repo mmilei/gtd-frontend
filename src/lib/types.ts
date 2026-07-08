@@ -21,9 +21,6 @@ export interface Item {
 
 export type BucketsMap = Record<Bucket, Item[]>
 
-/** Closed vocabulary of life areas — the backend silently drops any value not in this set. */
-export const AREA_OPTIONS = ['personal', 'amistad', 'ejercicio', 'trabajo', 'salud', 'finanzas', 'hogar', 'aprendizaje'] as const
-
 /** Dimension a cross-bucket FacetView groups by. */
 export type Facet = 'tag' | 'project' | 'location' | 'area'
 

@@ -15,7 +15,7 @@ import { TriageOverlay } from './components/TriageOverlay'
 import { UndoToast, useUndoToast } from './components/UndoToast'
 import { AmbientScene } from './components/AmbientScene'
 import { FocusOverlay } from './components/FocusOverlay'
-import { chat, confirmChatOp, getChatHistory } from './lib/api'
+import { chat, confirmChatOp, getAreas, getChatHistory } from './lib/api'
 import { celebrate } from './lib/celebration'
 import { orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
@@ -68,6 +68,8 @@ export default function App() {
   // instead of dropping the user back to the plain bucket list.
   const returnToFacetRef = useRef<{ facet: Facet; value: string } | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
+  // The area vocabulary lives in backend config (gtd.areas) — fetched once, empty while loading.
+  const [areaOptions, setAreaOptions] = useState<string[]>([])
   const [reviewOpen, setReviewOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [focusSession, setFocusSession] = useState<{ queue: Item[]; startIndex: number } | null>(null)
@@ -81,6 +83,14 @@ export default function App() {
       .then(history => setFeed(hydrateFeed(history)))
       .catch(() => {
         // no transcript yet (fresh vault) or backend unavailable — starting empty is fine
+      })
+  }, [])
+
+  useEffect(() => {
+    getAreas()
+      .then(setAreaOptions)
+      .catch(() => {
+        // backend unavailable — AreaBar stays hidden and the area select offers only the current value
       })
   }, [])
 
@@ -268,7 +278,7 @@ export default function App() {
           onOpenProject={value => setFacetView({ facet: 'project', value })}
         />
         <main className="flex min-w-0 flex-1 flex-col">
-          <AreaBar onOpenArea={value => setFacetView({ facet: 'area', value })} />
+          <AreaBar areas={areaOptions} onOpenArea={value => setFacetView({ facet: 'area', value })} />
           <ItemList
             bucket={bucket}
             items={visibleItems}
@@ -299,6 +309,7 @@ export default function App() {
           tagSuggestions={tagSuggestions}
           projectSuggestions={projectSuggestions}
           locationSuggestions={locationSuggestions}
+          areaOptions={areaOptions}
           onClose={() => {
             setEditingFile(null)
             if (returnToFacetRef.current) {

@@ -2,7 +2,7 @@ import { Check, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
-import { AREA_OPTIONS, SYSTEM_TAGS } from '../lib/types'
+import { SYSTEM_TAGS } from '../lib/types'
 import type { Bucket, Item } from '../lib/types'
 import { Overlay } from './Overlay'
 import { PillEditor } from './PillEditor'
@@ -12,6 +12,8 @@ interface Props {
   tagSuggestions: string[]
   projectSuggestions: string[]
   locationSuggestions: string[]
+  /** The backend's configured area vocabulary (GET /api/areas) — may still be loading (empty). */
+  areaOptions: string[]
   onClose: () => void
   onSaved: () => void
 }
@@ -32,7 +34,7 @@ const sameSet = (a: string[], b: string[]) =>
 /** Same rounding `save` applies before persisting, so `dirty` doesn't flag e.g. "30.4" as changed when it would save as the already-current 30. */
 const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
 
-export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, onClose, onSaved }: Props) {
+export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved }: Props) {
   const [original, setOriginal] = useState<Item | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
 
@@ -42,7 +44,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const [tags, setTags] = useState<string[]>([])
   const [people, setPeople] = useState<string[]>([])
   const [due, setDue] = useState('')
-  const [todaySince, setTodaySince] = useState('')
   const [area, setArea] = useState('')
   const [project, setProject] = useState('')
   const [location, setLocation] = useState('')
@@ -65,7 +66,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         setTags(item.tags ?? [])
         setPeople(item.delegado_a ?? [])
         setDue(normDate(item.due))
-        setTodaySince(normDate(item.today_since))
         setArea(item.area ?? '')
         setProject(item.project ?? '')
         setLocation(item.location ?? '')
@@ -88,13 +88,12 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       !sameSet(tags, original.tags ?? []) ||
       !sameSet(people, original.delegado_a ?? []) ||
       (due || null) !== (normDate(original.due) || null) ||
-      (todaySince || null) !== (normDate(original.today_since) || null) ||
       (area || null) !== (original.area ?? null) ||
       (project.trim() || null) !== (original.project ?? null) ||
       (location.trim() || null) !== (original.location ?? null) ||
       normEstimate(estimate) !== (original.estimate_minutes ?? null)
     )
-  }, [original, file, title, body, bucket, tags, people, due, todaySince, area, project, location, estimate])
+  }, [original, file, title, body, bucket, tags, people, due, area, project, location, estimate])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -114,7 +113,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     setTags(original.tags ?? [])
     setPeople(original.delegado_a ?? [])
     setDue(normDate(original.due))
-    setTodaySince(normDate(original.today_since))
     setArea(original.area ?? '')
     setProject(original.project ?? '')
     setLocation(original.location ?? '')
@@ -135,11 +133,11 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       if (title && title !== (original.title ?? file)) meta.title = title
       if (!sameSet(tags, original.tags ?? [])) meta.tags = tags
       if ((due || null) !== (normDate(original.due) || null)) meta.due = due || null
-      if (bucket === 'today' && !original.today_since && !todaySince) {
+      // today_since is system-managed (feeds daysInToday and today ordering) — auto-set when the
+      // item first lands in today, never hand-edited.
+      if (bucket === 'today' && !original.today_since) {
         const d = new Date()
         meta.today_since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      } else if ((todaySince || null) !== (normDate(original.today_since) || null)) {
-        meta.today_since = todaySince || null
       }
       if (!sameSet(people, original.delegado_a ?? [])) meta.delegado_a = people
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
@@ -154,7 +152,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject, location: nextLocation })
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
@@ -272,7 +270,12 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
               className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink focus:border-accent/60 focus:outline-none"
             >
               <option value="">—</option>
-              {AREA_OPTIONS.map(a => (
+              {/* An on-disk value outside the current vocabulary must stay visible (and selectable
+                  back) instead of the select silently rendering as empty. */}
+              {area && !areaOptions.includes(area) && (
+                <option value={area}>{area} (legacy)</option>
+              )}
+              {areaOptions.map(a => (
                 <option key={a} value={a}>
                   {a}
                 </option>
@@ -303,15 +306,14 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
             </label>
           )}
           {bucket === 'today' && (
-            <label className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5">
               <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">In today since</span>
-              <input
-                type="date"
-                value={todaySince}
-                onChange={e => setTodaySince(e.target.value)}
-                className="rounded-card border border-line bg-bg px-3 py-1.5 font-mono text-[12px] text-ink focus:border-accent/60 focus:outline-none [color-scheme:dark]"
-              />
-            </label>
+              {/* System-managed (feeds daysInToday and today ordering): auto-set on save when the
+                  item first enters today, never hand-edited. */}
+              <span className="rounded-card border border-line bg-bg/50 px-3 py-1.5 font-mono text-[12px] text-ink-muted">
+                {normDate(original?.today_since) || 'set on save'}
+              </span>
+            </div>
           )}
         </div>
 
