@@ -236,7 +236,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
               value={project}
               onChange={e => setProject(e.target.value)}
               list="edit-project-suggestions"
-              placeholder="e.g. gtd-frontend"
+              placeholder="e.g. gtd-project"
               spellCheck={false}
               className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
             />
@@ -252,7 +252,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
               value={location}
               onChange={e => setLocation(e.target.value)}
               list="edit-location-suggestions"
-              placeholder="e.g. ferretería"
+              placeholder="e.g. hardware store"
               spellCheck={false}
               className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
             />
