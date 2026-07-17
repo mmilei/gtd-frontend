@@ -12,6 +12,7 @@ export interface Item {
   delegado_a?: string[]
   area?: string | null
   project?: string | null
+  location?: string | null
   markdownified?: boolean
   estimate_minutes?: number | null
   /** false = classifier used the low-confidence fallback prompt, pending review. Absent/true/null = confirmed. */
@@ -20,8 +21,8 @@ export interface Item {
 
 export type BucketsMap = Record<Bucket, Item[]>
 
-/** Dimension a cross-bucket FacetView groups by. Open union — 'location' etc. can join once the field exists. */
-export type Facet = 'tag' | 'project'
+/** Dimension a cross-bucket FacetView groups by. */
+export type Facet = 'tag' | 'project' | 'location' | 'area'
 
 export interface Op {
   op: string

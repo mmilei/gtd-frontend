@@ -50,6 +50,11 @@ export function getToday(): Promise<Item[]> {
   return request('/today')
 }
 
+/** The backend's configured `area` vocabulary (gtd.areas), in display order — the single source of truth for area UI. */
+export function getAreas(): Promise<string[]> {
+  return request('/areas')
+}
+
 export function fetchItem(filename: string): Promise<Item> {
   return request(`/items/${encodeURIComponent(filename)}`)
 }

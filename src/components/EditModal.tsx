@@ -11,6 +11,9 @@ interface Props {
   file: string
   tagSuggestions: string[]
   projectSuggestions: string[]
+  locationSuggestions: string[]
+  /** The backend's configured area vocabulary (GET /api/areas) — may still be loading (empty). */
+  areaOptions: string[]
   onClose: () => void
   onSaved: () => void
 }
@@ -31,7 +34,7 @@ const sameSet = (a: string[], b: string[]) =>
 /** Same rounding `save` applies before persisting, so `dirty` doesn't flag e.g. "30.4" as changed when it would save as the already-current 30. */
 const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
 
-export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, onSaved }: Props) {
+export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved }: Props) {
   const [original, setOriginal] = useState<Item | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
 
@@ -41,9 +44,9 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
   const [tags, setTags] = useState<string[]>([])
   const [people, setPeople] = useState<string[]>([])
   const [due, setDue] = useState('')
-  const [todaySince, setTodaySince] = useState('')
   const [area, setArea] = useState('')
   const [project, setProject] = useState('')
+  const [location, setLocation] = useState('')
   const [estimate, setEstimate] = useState('')
 
   const [saving, setSaving] = useState(false)
@@ -63,9 +66,9 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
         setTags(item.tags ?? [])
         setPeople(item.delegado_a ?? [])
         setDue(normDate(item.due))
-        setTodaySince(normDate(item.today_since))
         setArea(item.area ?? '')
         setProject(item.project ?? '')
+        setLocation(item.location ?? '')
         setEstimate(item.estimate_minutes != null ? String(item.estimate_minutes) : '')
       })
       .catch(() => !cancelled && setLoadFailed(true))
@@ -85,12 +88,12 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       !sameSet(tags, original.tags ?? []) ||
       !sameSet(people, original.delegado_a ?? []) ||
       (due || null) !== (normDate(original.due) || null) ||
-      (todaySince || null) !== (normDate(original.today_since) || null) ||
       (area || null) !== (original.area ?? null) ||
       (project.trim() || null) !== (original.project ?? null) ||
+      (location.trim() || null) !== (original.location ?? null) ||
       normEstimate(estimate) !== (original.estimate_minutes ?? null)
     )
-  }, [original, file, title, body, bucket, tags, people, due, todaySince, area, project, estimate])
+  }, [original, file, title, body, bucket, tags, people, due, area, project, location, estimate])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -110,9 +113,9 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
     setTags(original.tags ?? [])
     setPeople(original.delegado_a ?? [])
     setDue(normDate(original.due))
-    setTodaySince(normDate(original.today_since))
     setArea(original.area ?? '')
     setProject(original.project ?? '')
+    setLocation(original.location ?? '')
     setEstimate(original.estimate_minutes != null ? String(original.estimate_minutes) : '')
   }
 
@@ -130,16 +133,18 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       if (title && title !== (original.title ?? file)) meta.title = title
       if (!sameSet(tags, original.tags ?? [])) meta.tags = tags
       if ((due || null) !== (normDate(original.due) || null)) meta.due = due || null
-      if (bucket === 'today' && !original.today_since && !todaySince) {
+      // today_since is system-managed (feeds daysInToday and today ordering) — auto-set when the
+      // item first lands in today, never hand-edited.
+      if (bucket === 'today' && !original.today_since) {
         const d = new Date()
         meta.today_since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      } else if ((todaySince || null) !== (normDate(original.today_since) || null)) {
-        meta.today_since = todaySince || null
       }
       if (!sameSet(people, original.delegado_a ?? [])) meta.delegado_a = people
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
       const nextProject = project.trim() || null
       if (nextProject !== (original.project ?? null)) meta.project = nextProject
+      const nextLocation = location.trim() || null
+      if (nextLocation !== (original.location ?? null)) meta.location = nextLocation
       const estimateNum = normEstimate(estimate)
       if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
       // A manual save is itself a confirmation — with or without other edits — so a task the
@@ -147,7 +152,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject })
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
@@ -231,7 +236,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
               value={project}
               onChange={e => setProject(e.target.value)}
               list="edit-project-suggestions"
-              placeholder="e.g. gtd-frontend"
+              placeholder="e.g. gtd-project"
               spellCheck={false}
               className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
             />
@@ -240,6 +245,42 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
                 <option key={p} value={p} />
               ))}
             </datalist>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Location</span>
+            <input
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              list="edit-location-suggestions"
+              placeholder="e.g. hardware store"
+              spellCheck={false}
+              className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
+            />
+            <datalist id="edit-location-suggestions">
+              {locationSuggestions.map(l => (
+                <option key={l} value={l} />
+              ))}
+            </datalist>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Area</span>
+            <select
+              value={area}
+              onChange={e => setArea(e.target.value)}
+              className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink focus:border-accent/60 focus:outline-none"
+            >
+              <option value="">—</option>
+              {/* An on-disk value outside the current vocabulary must stay visible (and selectable
+                  back) instead of the select silently rendering as empty. */}
+              {area && !areaOptions.includes(area) && (
+                <option value={area}>{area} (legacy)</option>
+              )}
+              {areaOptions.map(a => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Due date</span>
@@ -265,26 +306,14 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, onClose, o
             </label>
           )}
           {bucket === 'today' && (
-            <label className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5">
               <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">In today since</span>
-              <input
-                type="date"
-                value={todaySince}
-                onChange={e => setTodaySince(e.target.value)}
-                className="rounded-card border border-line bg-bg px-3 py-1.5 font-mono text-[12px] text-ink focus:border-accent/60 focus:outline-none [color-scheme:dark]"
-              />
-            </label>
-          )}
-          {bucket === 'reference' && (
-            <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Area</span>
-              <input
-                value={area}
-                onChange={e => setArea(e.target.value)}
-                placeholder="e.g. work, health, finance"
-                className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink focus:border-accent/60 focus:outline-none"
-              />
-            </label>
+              {/* System-managed (feeds daysInToday and today ordering): auto-set on save when the
+                  item first enters today, never hand-edited. */}
+              <span className="rounded-card border border-line bg-bg/50 px-3 py-1.5 font-mono text-[12px] text-ink-muted">
+                {normDate(original?.today_since) || 'set on save'}
+              </span>
+            </div>
           )}
         </div>
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AreaBar } from './components/AreaBar'
 import { BucketRail } from './components/BucketRail'
 import { CaptureBar } from './components/CaptureBar'
 import { EditModal } from './components/EditModal'
@@ -14,7 +15,7 @@ import { TriageOverlay } from './components/TriageOverlay'
 import { UndoToast, useUndoToast } from './components/UndoToast'
 import { AmbientScene } from './components/AmbientScene'
 import { FocusOverlay } from './components/FocusOverlay'
-import { chat, confirmChatOp, getChatHistory } from './lib/api'
+import { chat, confirmChatOp, getAreas, getChatHistory } from './lib/api'
 import { celebrate } from './lib/celebration'
 import { orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
@@ -67,6 +68,8 @@ export default function App() {
   // instead of dropping the user back to the plain bucket list.
   const returnToFacetRef = useRef<{ facet: Facet; value: string } | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
+  // The area vocabulary lives in backend config (gtd.areas) — fetched once, empty while loading.
+  const [areaOptions, setAreaOptions] = useState<string[]>([])
   const [reviewOpen, setReviewOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [focusSession, setFocusSession] = useState<{ queue: Item[]; startIndex: number } | null>(null)
@@ -80,6 +83,14 @@ export default function App() {
       .then(history => setFeed(hydrateFeed(history)))
       .catch(() => {
         // no transcript yet (fresh vault) or backend unavailable — starting empty is fine
+      })
+  }, [])
+
+  useEffect(() => {
+    getAreas()
+      .then(setAreaOptions)
+      .catch(() => {
+        // backend unavailable — AreaBar stays hidden and the area select offers only the current value
       })
   }, [])
 
@@ -148,6 +159,18 @@ export default function App() {
       for (const item of items) {
         const p = item.project?.trim()
         if (p) all.add(p)
+      }
+    }
+    return [...all].sort()
+  }, [buckets])
+
+  // Distinct non-blank location values across all buckets — same client-side aggregation as projects.
+  const locationSuggestions = useMemo(() => {
+    const all = new Set<string>()
+    for (const items of Object.values(buckets)) {
+      for (const item of items) {
+        const l = item.location?.trim()
+        if (l) all.add(l)
       }
     }
     return [...all].sort()
@@ -255,6 +278,7 @@ export default function App() {
           onOpenProject={value => setFacetView({ facet: 'project', value })}
         />
         <main className="flex min-w-0 flex-1 flex-col">
+          <AreaBar areas={areaOptions} onOpenArea={value => setFacetView({ facet: 'area', value })} />
           <ItemList
             bucket={bucket}
             items={visibleItems}
@@ -263,6 +287,8 @@ export default function App() {
             onToggleTag={toggleTag}
             onViewTagAcross={value => setFacetView({ facet: 'tag', value })}
             onOpenItem={setEditingFile}
+            onOpenProject={value => setFacetView({ facet: 'project', value })}
+            onOpenLocation={value => setFacetView({ facet: 'location', value })}
             onComplete={complete}
             onDismiss={remove}
             onFocus={bucket === 'today' ? startFocus : undefined}
@@ -282,6 +308,8 @@ export default function App() {
           file={editingFile}
           tagSuggestions={tagSuggestions}
           projectSuggestions={projectSuggestions}
+          locationSuggestions={locationSuggestions}
+          areaOptions={areaOptions}
           onClose={() => {
             setEditingFile(null)
             if (returnToFacetRef.current) {
@@ -305,6 +333,8 @@ export default function App() {
             setFacetView(null)
             setEditingFile(file)
           }}
+          onOpenProject={value => setFacetView({ facet: 'project', value })}
+          onOpenLocation={value => setFacetView({ facet: 'location', value })}
           onComplete={complete}
           onDismiss={remove}
           onClose={() => setFacetView(null)}

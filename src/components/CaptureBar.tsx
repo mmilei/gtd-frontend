@@ -8,7 +8,7 @@ interface Props {
   onError: (message: string) => void
 }
 
-/** Persistent capture bar. `/` or Ctrl+K focuses it from anywhere. */
+/** Persistent capture bar. `c` focuses it from anywhere (Ctrl+K belongs to the search overlay). */
 export function CaptureBar({ busy, onSend, onError }: Props) {
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -20,8 +20,11 @@ export function CaptureBar({ busy, onSend, onError }: Props) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Plain `c`, no modifiers: `/` used to fill this role but suggested a slash-command grammar
+      // that doesn't exist (typed text goes verbatim to the classifier), and Ctrl+K was dropped
+      // here because the global search overlay owns that shortcut.
       const inField = (e.target as HTMLElement | null)?.closest('input, textarea, [role="dialog"]')
-      if ((e.key === '/' && !inField) || (e.key === 'k' && (e.ctrlKey || e.metaKey))) {
+      if (e.key === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey && !inField) {
         e.preventDefault()
         inputRef.current?.focus()
       }
@@ -77,7 +80,7 @@ export function CaptureBar({ busy, onSend, onError }: Props) {
             }
           }}
           rows={1}
-          placeholder='Capture anything — a task, an idea, something to delegate…  ("/" to focus)'
+          placeholder='Capture anything — a task, an idea, something to delegate…  ("c" to focus)'
           spellCheck={false}
           className="max-h-36 min-h-9 flex-1 resize-none rounded-card border border-line bg-bg px-3.5 py-2 text-[13.5px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
         />

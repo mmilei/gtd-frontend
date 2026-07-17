@@ -14,13 +14,15 @@ interface Props {
   onToggleTag: (tag: string, additive: boolean) => void
   onViewTagAcross: (tag: string) => void
   onOpenItem: (file: string) => void
+  onOpenProject: (project: string) => void
+  onOpenLocation: (location: string) => void
   onComplete: (item: Item) => Promise<boolean>
   onDismiss: (item: Item) => Promise<boolean>
   /** Present only for Today — starts a focus session (optionally from a given item). */
   onFocus?: (item?: Item) => void
 }
 
-export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onViewTagAcross, onOpenItem, onComplete, onDismiss, onFocus }: Props) {
+export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, onViewTagAcross, onOpenItem, onOpenProject, onOpenLocation, onComplete, onDismiss, onFocus }: Props) {
   const meta = BUCKET_META[bucket]
   const [query, setQuery] = useState('')
   const projection = bucket === 'today' ? projectDay(items) : null
@@ -94,6 +96,8 @@ export function ItemList({ bucket, items, allItems, selectedTags, onToggleTag, o
                 item={item}
                 bucket={bucket}
                 onOpen={onOpenItem}
+                onOpenProject={onOpenProject}
+                onOpenLocation={onOpenLocation}
                 onComplete={onComplete}
                 onDismiss={onDismiss}
                 onFocus={onFocus}
