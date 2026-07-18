@@ -8,14 +8,23 @@ interface Props {
   onError: (message: string) => void
 }
 
+/** Speech-recognition languages offered for voice capture (BCP-47 tags). */
+const MIC_LANGS: { value: string; label: string }[] = [
+  { value: 'es-AR', label: 'ES' },
+  { value: 'en-US', label: 'EN' },
+  { value: 'pt-BR', label: 'PT' },
+]
+
 /** Persistent capture bar. `c` focuses it from anywhere (Ctrl+K belongs to the search overlay). */
 export function CaptureBar({ busy, onSend, onError }: Props) {
   const [text, setText] = useState('')
+  const [lang, setLang] = useState('es-AR')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const { micState, start, stop } = useVoiceCapture({
     onText: setText,
     onError,
+    lang,
   })
 
   useEffect(() => {
@@ -84,6 +93,20 @@ export function CaptureBar({ busy, onSend, onError }: Props) {
           spellCheck={false}
           className="max-h-36 min-h-9 flex-1 resize-none rounded-card border border-line bg-bg px-3.5 py-2 text-[13.5px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
         />
+        <select
+          value={lang}
+          onChange={e => setLang(e.target.value)}
+          disabled={micState !== 'idle'}
+          title="Voice input language"
+          aria-label="Voice input language"
+          className="h-9 shrink-0 rounded-card border border-line bg-bg px-1.5 font-mono text-[11px] text-ink-muted transition-colors hover:border-line-strong focus:border-accent/60 focus:outline-none disabled:opacity-50"
+        >
+          {MIC_LANGS.map(l => (
+            <option key={l.value} value={l.value}>
+              {l.label}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={() => (micState === 'idle' ? start() : micState === 'recording' ? stop() : undefined)}
