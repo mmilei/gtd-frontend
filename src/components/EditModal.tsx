@@ -288,21 +288,38 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Priority</span>
-            <select
-              value={priority}
-              onChange={e => setPriority(e.target.value as Priority | '')}
-              className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink focus:border-accent/60 focus:outline-none"
-            >
-              <option value="">—</option>
-              {PRIORITY_ORDER.map(p => (
-                <option key={p} value={p}>
-                  {PRIORITY_META[p].label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div role="group" aria-label="Priority" className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPriority('')}
+                aria-pressed={priority === ''}
+                className={`rounded-full border px-3 py-1 text-[12px] transition-colors ${
+                  priority === '' ? 'border-transparent bg-raised text-ink' : 'border-line text-ink-muted hover:border-line-strong'
+                }`}
+              >
+                —
+              </button>
+              {PRIORITY_ORDER.map(p => {
+                const active = p === priority
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPriority(p)}
+                    aria-pressed={active}
+                    className={`rounded-full border px-3 py-1 text-[12px] transition-colors ${
+                      active ? 'border-transparent text-ink' : 'border-line text-ink-muted hover:border-line-strong'
+                    }`}
+                    style={active ? { background: `color-mix(in srgb, var(--color-accent) ${PRIORITY_META[p].mix}%, transparent)` } : undefined}
+                  >
+                    {PRIORITY_META[p].label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           <label className="flex flex-col gap-1.5">
             <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Due date</span>
             <input
