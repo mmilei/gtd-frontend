@@ -27,7 +27,7 @@ const state: Record<Bucket, Item[]> = {
     { file: '20260628-071500-thing-about-the-thing.md', bucket: 'backlog', title: 'thing about the thing', tags: [], body: '', created: '2026-06-28', confirmed: false },
   ],
   waiting: [
-    { file: '20260625-110000-wait-for-design-team.md', bucket: 'waiting', title: 'Wait for design team response', delegado_a: ['design team'], tags: [], body: '', created: '2026-06-25', project: 'java-gtd' },
+    { file: '20260625-110000-wait-for-design-team.md', bucket: 'waiting', title: 'Wait for design team response', related_people: ['design team'], tags: [], body: '', created: '2026-06-25', project: 'java-gtd' },
   ],
   someday: [
     { file: '20260620-120000-learn-rust.md', bucket: 'someday', title: 'Learn Rust', tags: [], body: '', created: '2026-06-20' },
@@ -91,7 +91,7 @@ export async function chat(message: string): Promise<ChatResponse> {
     body: '',
     created: todayStr(),
     ...(bucket === 'today' ? { due: todayStr(), today_since: todayStr() } : {}),
-    ...(bucket === 'waiting' ? { delegado_a: [] } : {}),
+    ...(bucket === 'waiting' ? { related_people: [] } : {}),
   }
   state[bucket].unshift(item)
   return { fallback: false, ops: [{ op: 'create', filed: true, bucket, title, file }] }

@@ -9,7 +9,7 @@ export interface Item {
   created?: string
   due?: string | null
   today_since?: string | null
-  delegado_a?: string[]
+  related_people?: string[]
   area?: string | null
   project?: string | null
   location?: string | null

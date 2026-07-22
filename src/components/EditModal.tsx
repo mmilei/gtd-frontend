@@ -66,7 +66,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         setBody(normBody(item.body))
         setBucket(item.bucket ?? null)
         setTags(item.tags ?? [])
-        setPeople(item.delegado_a ?? [])
+        setPeople(item.related_people ?? [])
         setDue(normDate(item.due))
         setArea(item.area ?? '')
         setProject(item.project ?? '')
@@ -89,7 +89,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       body !== normBody(original.body) ||
       bucket !== (original.bucket ?? null) ||
       !sameSet(tags, original.tags ?? []) ||
-      !sameSet(people, original.delegado_a ?? []) ||
+      !sameSet(people, original.related_people ?? []) ||
       (due || null) !== (normDate(original.due) || null) ||
       (area || null) !== (original.area ?? null) ||
       (project.trim() || null) !== (original.project ?? null) ||
@@ -115,7 +115,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     setBody(normBody(original.body))
     setBucket(original.bucket ?? null)
     setTags(original.tags ?? [])
-    setPeople(original.delegado_a ?? [])
+    setPeople(original.related_people ?? [])
     setDue(normDate(original.due))
     setArea(original.area ?? '')
     setProject(original.project ?? '')
@@ -144,7 +144,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         const d = new Date()
         meta.today_since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       }
-      if (!sameSet(people, original.delegado_a ?? [])) meta.delegado_a = people
+      if (!sameSet(people, original.related_people ?? [])) meta.related_people = people
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
       const nextProject = project.trim() || null
       if (nextProject !== (original.project ?? null)) meta.project = nextProject
@@ -158,7 +158,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null })
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, related_people: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()

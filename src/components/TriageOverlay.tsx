@@ -144,7 +144,7 @@ export function TriageOverlay({ onClose, onChanged }: Props) {
                   </span>
                 )}
                 {item.due && <span className="text-waiting">due {item.due}</span>}
-                {(item.delegado_a ?? []).length > 0 && <span>{item.delegado_a!.map(p => `@${p}`).join(' ')}</span>}
+                {(item.related_people ?? []).length > 0 && <span>{item.related_people!.map(p => `@${p}`).join(' ')}</span>}
               </div>
               {item.body?.trim() && (
                 <p className="mt-3 line-clamp-3 text-[12.5px] leading-relaxed text-ink-muted">{item.body.trim()}</p>

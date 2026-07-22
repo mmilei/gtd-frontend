@@ -67,7 +67,7 @@ export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, 
   const tags = (item.tags ?? []).filter(t => !SYSTEM_TAGS.has(t))
   const snippet = bodySnippet(item.body)
   const age = daysInToday(item, bucket)
-  const people = item.delegado_a ?? []
+  const people = item.related_people ?? []
   const project = item.project?.trim()
   const location = item.location?.trim()
 
