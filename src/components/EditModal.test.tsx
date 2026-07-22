@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Item } from '../lib/types'
@@ -76,6 +76,30 @@ describe('today_since', () => {
 
     await waitFor(() => expect(patchMeta).toHaveBeenCalled())
     expect(vi.mocked(patchMeta).mock.calls[0][1]).not.toHaveProperty('today_since')
+  })
+})
+
+describe('priority segmented control', () => {
+  it('offers Low/Medium/High and persists the choice', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    const group = screen.getByRole('group', { name: 'Priority' })
+    await user.click(within(group).getByRole('button', { name: 'High' }))
+    expect(screen.getByText('Discard changes')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Save'))
+    await screen.findByText('Saved ✓')
+    expect(patchMeta).toHaveBeenCalledWith('t.md', expect.objectContaining({ priority: 'high' }))
+  })
+
+  it('defaults to unset (—) for an item with no priority', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    const group = screen.getByRole('group', { name: 'Priority' })
+    expect(within(group).getByRole('button', { name: '—' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 

@@ -18,7 +18,7 @@ import { AmbientScene } from './components/AmbientScene'
 import { FocusOverlay } from './components/FocusOverlay'
 import { chat, confirmChatOp, getAreas, getChatHistory } from './lib/api'
 import { celebrate } from './lib/celebration'
-import { orderToday } from './lib/todayOrder'
+import { orderByPriority, orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
 import type { Bucket, ChatHistoryEntry, Facet, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
@@ -133,7 +133,7 @@ export default function App() {
       selectedTags.size === 0
         ? bucketItems
         : bucketItems.filter(i => [...selectedTags].every(t => (i.tags ?? []).includes(t)))
-    return bucket === 'today' ? orderToday(filtered) : filtered
+    return bucket === 'today' ? orderToday(filtered) : orderByPriority(filtered)
   }, [bucket, bucketItems, selectedTags])
 
   const startFocus = useCallback(

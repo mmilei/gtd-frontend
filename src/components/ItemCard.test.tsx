@@ -1,6 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { playBoink, playThunk } from '../lib/sound'
-import { formatCreated } from './ItemCard'
+import type { Item } from '../lib/types'
+import { formatCreated, ItemCard } from './ItemCard'
+
+function renderCard(item: Item) {
+  return render(
+    <ItemCard
+      item={item}
+      bucket="backlog"
+      onOpen={() => {}}
+      onComplete={vi.fn().mockResolvedValue(true)}
+      onDismiss={vi.fn().mockResolvedValue(true)}
+    />,
+  )
+}
 
 describe('formatCreated', () => {
   it('passes a plain YYYY-MM-DD date through unchanged', () => {
@@ -17,5 +31,17 @@ describe('dismiss vs done sounds', () => {
     expect(typeof playBoink).toBe('function')
     expect(typeof playThunk).toBe('function')
     expect(playThunk).not.toBe(playBoink)
+  })
+})
+
+describe('priority dot', () => {
+  it('renders nothing when the item has no priority', () => {
+    renderCard({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+    expect(screen.queryByTitle(/Priority:/)).not.toBeInTheDocument()
+  })
+
+  it('renders a labelled dot for each priority level', () => {
+    renderCard({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], priority: 'high' })
+    expect(screen.getByTitle('Priority: High')).toBeInTheDocument()
   })
 })
