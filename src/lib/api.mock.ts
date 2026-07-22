@@ -23,6 +23,8 @@ const state: Record<Bucket, Item[]> = {
   backlog: [
     { file: '20260627-150000-write-project-readme.md', bucket: 'backlog', title: 'Write project README', tags: ['work'], body: '', created: '2026-06-27', project: 'gtd-frontend', area: 'work' },
     { file: '20260627-160000-buy-hardware-supplies.md', bucket: 'backlog', title: 'Buy screws and wall plugs', tags: ['shopping'], body: '', created: '2026-06-27', location: 'hardware store', area: 'home' },
+    // A low-confidence capture the classifier wasn't sure about — surfaces in the Unconfirmed review queue.
+    { file: '20260628-071500-thing-about-the-thing.md', bucket: 'backlog', title: 'thing about the thing', tags: [], body: '', created: '2026-06-28', confirmed: false },
   ],
   waiting: [
     { file: '20260625-110000-wait-for-design-team.md', bucket: 'waiting', title: 'Wait for design team response', delegado_a: ['design team'], tags: [], body: '', created: '2026-06-25', project: 'java-gtd' },
@@ -107,6 +109,10 @@ export async function getBucket(bucket: string): Promise<Item[]> {
 
 export function getToday(): Promise<Item[]> {
   return getBucket('today')
+}
+
+export async function getUnconfirmed(): Promise<Item[]> {
+  return (Object.values(state).flat() as Item[]).filter(i => i.confirmed === false).map(i => ({ ...i }))
 }
 
 // Mirrors the backend's committed gtd.areas default.
@@ -210,7 +216,7 @@ export async function getEvents(_params: { limit?: number; actor?: string; op?: 
   return []
 }
 
-export async function transcribe(_audioBlob: Blob): Promise<{ text: string }> {
+export async function transcribe(_audioBlob: Blob, _language = 'es-AR'): Promise<{ text: string }> {
   return { text: '' }
 }
 
@@ -238,7 +244,7 @@ export async function selectProvider(id: string): Promise<{ active: string }> {
 // fails to compile — instead of the drift only surfacing as a runtime "X is not a function"
 // crash under VITE_MOCK=true.
 const _contract: typeof RealApi = {
-  chat, getBuckets, getBucket, getToday, getAreas, fetchItem, markDone, dismissItem,
+  chat, getBuckets, getBucket, getToday, getUnconfirmed, getAreas, fetchItem, markDone, dismissItem,
   moveItem, patchMeta, replaceBody, markdownifyItem, getReview, undo,
   confirmChatOp, confirmItem, getChatHistory, getEvents, transcribe,
   getProviders, selectProvider,

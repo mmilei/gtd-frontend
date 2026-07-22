@@ -7,10 +7,12 @@ interface Options {
   /** Live preview while speaking (Web Speech API) and the final Whisper pass both land here. */
   onText: (text: string) => void
   onError: (message: string) => void
+  /** BCP-47 language tag for both the live Web Speech preview and the Whisper transcription. */
+  lang?: string
 }
 
-/** Voice capture: MediaRecorder feeds /api/transcribe (Whisper); Web Speech gives a live es-AR preview. */
-export function useVoiceCapture({ onText, onError }: Options) {
+/** Voice capture: MediaRecorder feeds /api/transcribe (Whisper); Web Speech gives a live preview in `lang`. */
+export function useVoiceCapture({ onText, onError, lang = 'es-AR' }: Options) {
   const [micState, setMicState] = useState<MicState>('idle')
   const recorder = useRef<MediaRecorder | null>(null)
   const recognition = useRef<SpeechRecognition | null>(null)
@@ -50,7 +52,7 @@ export function useVoiceCapture({ onText, onError }: Options) {
         let finalText: string | undefined
         try {
           const blob = new Blob(chunks.current, { type: 'audio/webm' })
-          const { text } = await transcribe(blob)
+          const { text } = await transcribe(blob, lang)
           if (text?.trim()) {
             finalText = text.trim()
             onText(finalText)
@@ -72,7 +74,7 @@ export function useVoiceCapture({ onText, onError }: Options) {
         recognition.current = sr
         sr.continuous = true
         sr.interimResults = true
-        sr.lang = 'es-AR'
+        sr.lang = lang
         let finalText = ''
         sr.onresult = e => {
           let interim = ''
@@ -89,7 +91,7 @@ export function useVoiceCapture({ onText, onError }: Options) {
     } catch {
       onError('Could not access microphone.')
     }
-  }, [onText, onError])
+  }, [onText, onError, lang])
 
   // Release the mic/recognizer/recorder on unmount — `stop()` alone only covers the
   // explicit user-initiated path; MediaRecorder.onstop never fires if the component
