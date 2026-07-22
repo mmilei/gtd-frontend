@@ -1,6 +1,6 @@
 import { Check, Play, X } from 'lucide-react'
 import { useState } from 'react'
-import { playBoink } from '../lib/sound'
+import { playBoink, playThunk } from '../lib/sound'
 import { formatMinutes } from '../lib/todayOrder'
 import { SYSTEM_TAGS } from '../lib/types'
 import type { Bucket, Item } from '../lib/types'
@@ -26,6 +26,15 @@ function bodySnippet(body?: string): string {
   return t.slice(0, 80) + (t.length > 80 ? '…' : '')
 }
 
+/**
+ * Creation date for read-only display in any list. The backend stores `created` as a date but may
+ * hand back a full ISO datetime — normalize to YYYY-MM-DD so every list renders it identically.
+ * Shared with TriageOverlay so the two never drift.
+ */
+export function formatCreated(created: string): string {
+  return created.slice(0, 10)
+}
+
 /** Days the item has been sitting in Today. Informational, never alarmed. */
 function daysInToday(item: Item, bucket: Bucket): number {
   if (bucket !== 'today' || !item.today_since) return 0
@@ -35,9 +44,9 @@ function daysInToday(item: Item, bucket: Bucket): number {
 export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, onComplete, onDismiss, onFocus }: Props) {
   const [leaving, setLeaving] = useState(false)
 
-  async function run(e: React.MouseEvent, action: (i: Item) => Promise<boolean>, sound = false) {
+  async function run(e: React.MouseEvent, action: (i: Item) => Promise<boolean>, sound?: () => void) {
     e.stopPropagation()
-    if (sound) playBoink()
+    sound?.()
     setLeaving(true)
     const ok = await action(item)
     if (!ok) setLeaving(false)
@@ -74,7 +83,7 @@ export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, 
     >
       <div className="flex items-start gap-3">
         <button
-          onClick={e => run(e, onComplete, true)}
+          onClick={e => run(e, onComplete, playBoink)}
           title="Mark as done"
           aria-label={`Mark "${title}" as done`}
           className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-line-strong text-transparent transition-colors hover:border-done hover:text-done"
@@ -115,7 +124,11 @@ export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, 
             </div>
           )}
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] text-ink-faint">
-            {item.created && <span>{item.created}</span>}
+            {item.created && (
+              <span title={`Created ${formatCreated(item.created)}`} aria-label={`Created ${formatCreated(item.created)}`}>
+                {formatCreated(item.created)}
+              </span>
+            )}
             {item.due && <span className="text-waiting">due {item.due}</span>}
             {item.estimate_minutes != null && <span className="text-today">~{formatMinutes(item.estimate_minutes)}</span>}
             {people.length > 0 && <span>{people.map(p => `@${p}`).join(' ')}</span>}
@@ -148,7 +161,7 @@ export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, 
             </button>
           )}
           <button
-            onClick={e => run(e, onDismiss, true)}
+            onClick={e => run(e, onDismiss, playThunk)}
             title="Dismiss"
             aria-label={`Dismiss "${title}"`}
             className="rounded-md p-1.5 text-ink-muted transition-colors hover:bg-raised hover:text-discard"

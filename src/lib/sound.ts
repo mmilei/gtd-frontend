@@ -28,6 +28,35 @@ export function playChime(): void {
   }
 }
 
+/**
+ * Muffled descending "thunk" for dismiss/discard — deliberately duller and lower than the
+ * completion boink so the two actions never sound alike. Silent if AudioContext is blocked.
+ */
+export function playThunk(): void {
+  try {
+    const audio = getContext()
+    const osc = audio.createOscillator()
+    const gain = audio.createGain()
+    const filter = audio.createBiquadFilter()
+    // A low-pass takes the edge off the triangle wave, giving the "apagado" (muffled) character.
+    filter.type = 'lowpass'
+    filter.frequency.setValueAtTime(600, audio.currentTime)
+    osc.connect(filter)
+    filter.connect(gain)
+    gain.connect(audio.destination)
+    osc.type = 'triangle'
+    osc.frequency.setValueAtTime(300, audio.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(110, audio.currentTime + 0.16)
+    gain.gain.setValueAtTime(0, audio.currentTime)
+    gain.gain.linearRampToValueAtTime(0.16, audio.currentTime + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.22)
+    osc.start()
+    osc.stop(audio.currentTime + 0.24)
+  } catch {
+    // AudioContext unavailable — dismiss still works without sound
+  }
+}
+
 /** Short completion "boink" via WebAudio. Silent if the browser blocks AudioContext. */
 export function playBoink(): void {
   try {

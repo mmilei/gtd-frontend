@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { dismissItem, getBucket, moveItem } from '../lib/api'
 import { SYSTEM_TAGS } from '../lib/types'
 import type { Item } from '../lib/types'
+import { formatCreated } from './ItemCard'
 import { Overlay } from './Overlay'
 
 type TriageAction = 'today' | 'skip' | 'someday' | 'dismiss'
@@ -137,7 +138,11 @@ export function TriageOverlay({ onClose, onChanged }: Props) {
             <div className="min-h-32">
               <div className="font-display text-[17px] leading-snug text-ink">{item.title ?? item.file}</div>
               <div className="mt-1.5 flex flex-wrap gap-x-3 font-mono text-[11px] text-ink-faint">
-                {item.created && <span>{item.created}</span>}
+                {item.created && (
+                  <span title={`Created ${formatCreated(item.created)}`} aria-label={`Created ${formatCreated(item.created)}`}>
+                    {formatCreated(item.created)}
+                  </span>
+                )}
                 {item.due && <span className="text-waiting">due {item.due}</span>}
                 {(item.delegado_a ?? []).length > 0 && <span>{item.delegado_a!.map(p => `@${p}`).join(' ')}</span>}
               </div>
