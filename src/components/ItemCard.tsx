@@ -1,5 +1,6 @@
 import { Check, Play, X } from 'lucide-react'
 import { useState } from 'react'
+import { PRIORITY_META } from '../lib/priorityMeta'
 import { playBoink } from '../lib/sound'
 import { formatMinutes } from '../lib/todayOrder'
 import { SYSTEM_TAGS } from '../lib/types'
@@ -83,7 +84,17 @@ export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, 
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13.5px] leading-snug text-ink">{title}</div>
+          <div className="flex items-center gap-1.5">
+            {item.priority && (
+              <span
+                title={`Priority: ${PRIORITY_META[item.priority].label}`}
+                aria-label={`Priority: ${PRIORITY_META[item.priority].label}`}
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: `color-mix(in srgb, var(--color-accent) ${PRIORITY_META[item.priority].mix}%, transparent)` }}
+              />
+            )}
+            <div className="truncate text-[13.5px] leading-snug text-ink">{title}</div>
+          </div>
           {(project || location) && (
             <div className="mt-1 flex flex-wrap gap-1">
               {project && (

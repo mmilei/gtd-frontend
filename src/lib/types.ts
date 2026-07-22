@@ -17,7 +17,11 @@ export interface Item {
   estimate_minutes?: number | null
   /** false = classifier used the low-confidence fallback prompt, pending review. Absent/true/null = confirmed. */
   confirmed?: boolean | null
+  /** Importance, not urgency — bucket + due already cover urgency. Absent = unprioritized. */
+  priority?: 'low' | 'medium' | 'high' | null
 }
+
+export type Priority = 'low' | 'medium' | 'high'
 
 export type BucketsMap = Record<Bucket, Item[]>
 

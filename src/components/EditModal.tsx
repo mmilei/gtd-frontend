@@ -2,8 +2,9 @@ import { Check, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
+import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
-import type { Bucket, Item } from '../lib/types'
+import type { Bucket, Item, Priority } from '../lib/types'
 import { Overlay } from './Overlay'
 import { PillEditor } from './PillEditor'
 
@@ -48,6 +49,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const [project, setProject] = useState('')
   const [location, setLocation] = useState('')
   const [estimate, setEstimate] = useState('')
+  const [priority, setPriority] = useState<Priority | ''>('')
 
   const [saving, setSaving] = useState(false)
   const [saveLabel, setSaveLabel] = useState('Save')
@@ -70,6 +72,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         setProject(item.project ?? '')
         setLocation(item.location ?? '')
         setEstimate(item.estimate_minutes != null ? String(item.estimate_minutes) : '')
+        setPriority(item.priority ?? '')
       })
       .catch(() => !cancelled && setLoadFailed(true))
     return () => {
@@ -91,9 +94,10 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       (area || null) !== (original.area ?? null) ||
       (project.trim() || null) !== (original.project ?? null) ||
       (location.trim() || null) !== (original.location ?? null) ||
-      normEstimate(estimate) !== (original.estimate_minutes ?? null)
+      normEstimate(estimate) !== (original.estimate_minutes ?? null) ||
+      (priority || null) !== (original.priority ?? null)
     )
-  }, [original, file, title, body, bucket, tags, people, due, area, project, location, estimate])
+  }, [original, file, title, body, bucket, tags, people, due, area, project, location, estimate, priority])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -117,6 +121,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     setProject(original.project ?? '')
     setLocation(original.location ?? '')
     setEstimate(original.estimate_minutes != null ? String(original.estimate_minutes) : '')
+    setPriority(original.priority ?? '')
   }
 
   async function save() {
@@ -147,12 +152,13 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       if (nextLocation !== (original.location ?? null)) meta.location = nextLocation
       const estimateNum = normEstimate(estimate)
       if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
+      if ((priority || null) !== (original.priority ?? null)) meta.priority = priority || null
       // A manual save is itself a confirmation — with or without other edits — so a task the
       // classifier filed with low confidence (confirmed: false) never needs a separate review step.
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum })
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, delegado_a: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
@@ -278,6 +284,21 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
               {areaOptions.map(a => (
                 <option key={a} value={a}>
                   {a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Priority</span>
+            <select
+              value={priority}
+              onChange={e => setPriority(e.target.value as Priority | '')}
+              className="rounded-card border border-line bg-bg px-3 py-1.5 text-[12px] text-ink focus:border-accent/60 focus:outline-none"
+            >
+              <option value="">—</option>
+              {PRIORITY_ORDER.map(p => (
+                <option key={p} value={p}>
+                  {PRIORITY_META[p].label}
                 </option>
               ))}
             </select>

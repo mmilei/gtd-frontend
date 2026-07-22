@@ -79,6 +79,30 @@ describe('today_since', () => {
   })
 })
 
+describe('priority select', () => {
+  it('offers Low/Medium/High and persists the choice', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    const select = screen.getByLabelText('Priority') as HTMLSelectElement
+    await user.selectOptions(select, 'High')
+    expect(screen.getByText('Discard changes')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Save'))
+    await screen.findByText('Saved ✓')
+    expect(patchMeta).toHaveBeenCalledWith('t.md', expect.objectContaining({ priority: 'high' }))
+  })
+
+  it('defaults to unset for an item with no priority', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    const select = screen.getByLabelText('Priority') as HTMLSelectElement
+    expect(select.value).toBe('')
+  })
+})
+
 describe('area select', () => {
   it('offers the configured vocabulary', async () => {
     renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })

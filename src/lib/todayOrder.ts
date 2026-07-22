@@ -1,4 +1,20 @@
-import type { Item } from './types'
+import type { Item, Priority } from './types'
+
+const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 }
+
+/**
+ * Priority-only order for buckets with no other sort (backlog/waiting/someday/reference).
+ * Unprioritized items sink to the bottom, keeping their original relative order (stable sort).
+ * `today` is not touched here — it keeps orderToday() (due/today_since/estimate); combining the
+ * two is deliberately left unresolved, see the backlog ticket this PR spawns.
+ */
+export function orderByPriority(items: Item[]): Item[] {
+  return [...items].sort((a, b) => {
+    const rankA = a.priority ? PRIORITY_RANK[a.priority] : 3
+    const rankB = b.priority ? PRIORITY_RANK[b.priority] : 3
+    return rankA - rankB
+  })
+}
 
 /**
  * Execution order for Today (the app decides so the user doesn't have to):
