@@ -1,4 +1,4 @@
-import { CalendarCheck, History, Play, Search } from 'lucide-react'
+import { BadgeCheck, CalendarCheck, History, Play, Search } from 'lucide-react'
 import type { ApiStatus } from '../state/useBuckets'
 import { ProviderMenu } from './ProviderMenu'
 
@@ -14,9 +14,12 @@ interface Props {
   onOpenTriage: () => void
   onOpenReview: () => void
   onOpenHistory: () => void
+  onOpenUnconfirmed: () => void
+  /** Number of low-confidence captures awaiting review — drives the badge on the Unconfirmed button. */
+  unconfirmedCount: number
 }
 
-export function Header({ apiStatus, onOpenSearch, onOpenTriage, onOpenReview, onOpenHistory }: Props) {
+export function Header({ apiStatus, onOpenSearch, onOpenTriage, onOpenReview, onOpenHistory, onOpenUnconfirmed, unconfirmedCount }: Props) {
   return (
     <header className="flex h-13 shrink-0 items-center justify-between border-b border-line bg-surface px-5">
       <div className="flex items-baseline gap-2.5">
@@ -57,6 +60,17 @@ export function Header({ apiStatus, onOpenSearch, onOpenTriage, onOpenReview, on
           <History size={13} />
           History
         </button>
+        {unconfirmedCount > 0 && (
+          <button
+            onClick={onOpenUnconfirmed}
+            title={`Review ${unconfirmedCount} low-confidence capture${unconfirmedCount === 1 ? '' : 's'}`}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+          >
+            <BadgeCheck size={13} />
+            Unconfirmed
+            <span className="rounded-full bg-accent px-1.5 font-mono text-[10px] leading-[1.4] text-bg">{unconfirmedCount}</span>
+          </button>
+        )}
         <div className="mx-1 h-4 w-px bg-line" aria-hidden />
         <ProviderMenu apiStatus={apiStatus} />
       </div>

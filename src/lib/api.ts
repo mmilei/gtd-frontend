@@ -50,6 +50,11 @@ export function getToday(): Promise<Item[]> {
   return request('/today')
 }
 
+/** Low-confidence captures (confirmed:false) awaiting review — same Item shape as the bucket lists. */
+export function getUnconfirmed(): Promise<Item[]> {
+  return request('/unconfirmed')
+}
+
 /** The backend's configured `area` vocabulary (gtd.areas), in display order — the single source of truth for area UI. */
 export function getAreas(): Promise<string[]> {
   return request('/areas')
@@ -120,9 +125,11 @@ export function getEvents(params: { limit?: number; actor?: string; op?: string 
   return request(`/events${qs ? '?' + qs : ''}`)
 }
 
-export function transcribe(audioBlob: Blob): Promise<{ text: string }> {
+/** `language` is a BCP-47 tag (e.g. es-AR, en-US) forwarded to Whisper so it decodes in the right language. */
+export function transcribe(audioBlob: Blob, language = 'es-AR'): Promise<{ text: string }> {
   const form = new FormData()
   form.append('audio', audioBlob, 'recording.webm')
+  form.append('language', language)
   return request('/transcribe', { method: 'POST', body: form })
 }
 

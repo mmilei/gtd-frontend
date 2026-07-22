@@ -12,6 +12,7 @@ import { FacetView } from './components/FacetView'
 import { ReviewOverlay } from './components/ReviewOverlay'
 import { SearchOverlay } from './components/SearchOverlay'
 import { TriageOverlay } from './components/TriageOverlay'
+import { UnconfirmedQueue } from './components/UnconfirmedQueue'
 import { UndoToast, useUndoToast } from './components/UndoToast'
 import { AmbientScene } from './components/AmbientScene'
 import { FocusOverlay } from './components/FocusOverlay'
@@ -68,6 +69,9 @@ export default function App() {
   // instead of dropping the user back to the plain bucket list.
   const returnToFacetRef = useRef<{ facet: Facet; value: string } | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
+  const [unconfirmedOpen, setUnconfirmedOpen] = useState(false)
+  // Set when EditModal was opened from the Unconfirmed queue, so closing the editor returns there.
+  const returnToUnconfirmedRef = useRef(false)
   // The area vocabulary lives in backend config (gtd.areas) — fetched once, empty while loading.
   const [areaOptions, setAreaOptions] = useState<string[]>([])
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -140,6 +144,13 @@ export default function App() {
       setFocusSession({ queue, startIndex })
     },
     [buckets.today],
+  )
+
+  // Low-confidence captures live in their normal buckets, just flagged confirmed:false — count them
+  // straight off the loaded buckets so the Header badge stays in sync with every refresh.
+  const unconfirmedCount = useMemo(
+    () => Object.values(buckets).reduce((n, items) => n + items.filter(i => i.confirmed === false).length, 0),
+    [buckets],
   )
 
   const tagSuggestions = useMemo(() => {
@@ -268,6 +279,8 @@ export default function App() {
         onOpenTriage={() => setTriageOpen(true)}
         onOpenReview={() => setReviewOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
+        onOpenUnconfirmed={() => setUnconfirmedOpen(true)}
+        unconfirmedCount={unconfirmedCount}
       />
       <div className="flex min-h-0 flex-1">
         <BucketRail
@@ -316,6 +329,10 @@ export default function App() {
               setFacetView(returnToFacetRef.current)
               returnToFacetRef.current = null
             }
+            if (returnToUnconfirmedRef.current) {
+              setUnconfirmedOpen(true)
+              returnToUnconfirmedRef.current = false
+            }
           }}
           onSaved={() => void refresh()}
         />
@@ -341,6 +358,17 @@ export default function App() {
         />
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
+      {unconfirmedOpen && (
+        <UnconfirmedQueue
+          onClose={() => setUnconfirmedOpen(false)}
+          onChanged={() => void refresh()}
+          onEdit={file => {
+            returnToUnconfirmedRef.current = true
+            setUnconfirmedOpen(false)
+            setEditingFile(file)
+          }}
+        />
+      )}
       {reviewOpen && <ReviewOverlay onClose={() => setReviewOpen(false)} onChanged={() => void refresh()} />}
       {historyOpen && <HistoryPanel onClose={() => setHistoryOpen(false)} />}
       {focusSession && (
