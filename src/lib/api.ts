@@ -1,4 +1,4 @@
-import type { BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, ProvidersResponse, ReviewData } from './types'
+import type { BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData } from './types'
 
 const BASE = '/api'
 
@@ -137,6 +137,6 @@ export function getProviders(): Promise<ProvidersResponse> {
   return request('/providers')
 }
 
-export function selectProvider(id: string): Promise<{ active: string }> {
-  return request('/providers/select', json({ provider: id }))
+export function selectProvider(action: LlmAction, provider: string): Promise<{ action: string; active: string }> {
+  return request('/providers/select', json({ action, provider }))
 }

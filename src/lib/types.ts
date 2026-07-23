@@ -89,9 +89,19 @@ export interface ProviderInfo {
   status: 'UP' | 'DOWN'
 }
 
-export interface ProvidersResponse {
+/** The LLM-backed pipeline steps, each independently routable to a provider (matches the
+ * backend LlmAction enum). Values are the uppercase enum names the API expects. */
+export type LlmAction = 'TRIAGE' | 'ENRICHMENT' | 'RESOLVER'
+
+/** One pipeline action with its currently-active provider and the shared provider-status list. */
+export interface ActionProviders {
+  action: LlmAction
   active: string
   providers: ProviderInfo[]
+}
+
+export interface ProvidersResponse {
+  actions: ActionProviders[]
 }
 
 /** System tags never shown as user-facing context tags. */
