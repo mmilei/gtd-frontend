@@ -1,6 +1,6 @@
 // In-memory GTD state for demo/GitHub Pages deployment.
 // Substituted for ./api by the vite.config.ts alias when VITE_MOCK=true.
-import type { Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, ProvidersResponse, ReviewData } from './types'
+import type { ActionProviders, Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData } from './types'
 import type * as RealApi from './api'
 
 function todayStr(): string {
@@ -225,17 +225,22 @@ const PROVIDERS = [
   { id: 'ollama', label: 'Ollama (local)', status: 'DOWN' as const },
 ]
 
-let activeProvider = 'groq'
+const activeByAction: Record<LlmAction, string> = { TRIAGE: 'groq', ENRICHMENT: 'groq', RESOLVER: 'groq' }
 
 export async function getProviders(): Promise<ProvidersResponse> {
-  return { active: activeProvider, providers: PROVIDERS }
+  const actions: ActionProviders[] = (Object.keys(activeByAction) as LlmAction[]).map(action => ({
+    action,
+    active: activeByAction[action],
+    providers: PROVIDERS,
+  }))
+  return { actions }
 }
 
-export async function selectProvider(id: string): Promise<{ active: string }> {
-  const found = PROVIDERS.find(p => p.id === id)
-  if (!found || found.status !== 'UP') throw new Error(`Provider ${id} unavailable`)
-  activeProvider = id
-  return { active: activeProvider }
+export async function selectProvider(action: LlmAction, provider: string): Promise<{ action: string; active: string }> {
+  const found = PROVIDERS.find(p => p.id === provider)
+  if (!found || found.status !== 'UP') throw new Error(`Provider ${provider} unavailable`)
+  activeByAction[action] = provider
+  return { action, active: provider }
 }
 
 // Structural contract check: the Vite alias in vite.config.ts swaps this whole module in for

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getProviders, selectProvider } from '../lib/api'
 import type { ApiStatus } from '../state/useBuckets'
-import type { ProviderInfo } from '../lib/types'
+import type { ActionProviders, LlmAction, ProviderInfo } from '../lib/types'
 
 const STATUS_LABEL: Record<ApiStatus, string> = {
   connecting: 'Connecting…',
@@ -15,23 +15,26 @@ const STATUS_COLOR: Record<ApiStatus, string> = {
   offline: 'bg-discard',
 }
 
-/** API status chip; click opens the LLM provider switcher. */
+/** User-facing labels for each pipeline step, in run order. */
+const ACTION_LABEL: Record<LlmAction, string> = {
+  TRIAGE: 'Triage',
+  ENRICHMENT: 'Enrichment',
+  RESOLVER: 'Resolver',
+}
+
+/** API status chip; click opens the per-action LLM provider settings panel. */
 export function ProviderMenu({ apiStatus }: { apiStatus: ApiStatus }) {
   const [open, setOpen] = useState(false)
-  const [providers, setProviders] = useState<ProviderInfo[] | null>(null)
-  const [active, setActive] = useState<string | null>(null)
+  const [actions, setActions] = useState<ActionProviders[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
-    setProviders(null)
+    setActions(null)
     setError(null)
     getProviders()
-      .then(({ active, providers }) => {
-        setActive(active)
-        setProviders(providers)
-      })
+      .then(({ actions }) => setActions(actions))
       .catch(() => setError('Could not load providers.'))
 
     function onDocClick(e: MouseEvent) {
@@ -48,44 +51,60 @@ export function ProviderMenu({ apiStatus }: { apiStatus: ApiStatus }) {
     }
   }, [open])
 
-  async function pick(p: ProviderInfo) {
-    if (p.status !== 'UP' || p.id === active) return
+  async function pick(action: LlmAction, p: ProviderInfo) {
+    const row = actions?.find(a => a.action === action)
+    if (p.status !== 'UP' || !row || p.id === row.active) return
     try {
-      await selectProvider(p.id)
-      setActive(p.id)
-      setOpen(false)
+      await selectProvider(action, p.id)
+      // Optimistic: flip only this action's active, leave the others as they were.
+      setActions(prev => prev?.map(a => (a.action === action ? { ...a, active: p.id } : a)) ?? prev)
     } catch {
-      setError(`Could not switch to ${p.label}.`)
+      setError(`Could not switch ${ACTION_LABEL[action]} to ${p.label}.`)
     }
   }
-
-  const activeLabel = providers?.find(p => p.id === active)?.label
 
   return (
     <div ref={rootRef} className="relative">
       <button
         onClick={() => setOpen(v => !v)}
-        title="Switch LLM provider"
+        title="LLM provider settings"
         className="flex items-center gap-2 rounded-md px-2 py-1 text-[12px] text-ink-muted transition-colors hover:bg-raised"
       >
         <span className={`h-1.5 w-1.5 rounded-full ${STATUS_COLOR[apiStatus]}`} aria-hidden />
-        {apiStatus === 'online' && activeLabel ? `${STATUS_LABEL.online} — ${activeLabel}` : STATUS_LABEL[apiStatus]}
+        {STATUS_LABEL[apiStatus]}
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 z-30 mt-1 w-60 animate-fade-up rounded-card border border-line bg-raised py-1 shadow-xl">
-          {!providers && !error && <div className="px-3 py-2 font-mono text-[11px] text-ink-faint">loading…</div>}
-          {providers?.map(p => (
-            <button
-              key={p.id}
-              onClick={() => pick(p)}
-              disabled={p.status !== 'UP'}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-ink transition-colors hover:bg-surface disabled:opacity-40"
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'UP' ? 'bg-done' : 'bg-discard'}`} />
-              <span className="flex-1">{p.label}</span>
-              {p.id === active && <span className="font-mono text-[10px] text-accent">active</span>}
-            </button>
+        <div className="absolute top-full right-0 z-30 mt-1 w-72 animate-fade-up rounded-card border border-line bg-raised py-1 shadow-xl">
+          <div className="px-3 pt-1.5 pb-1 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+            Provider per action
+          </div>
+          {!actions && !error && <div className="px-3 py-2 font-mono text-[11px] text-ink-faint">loading…</div>}
+          {actions?.map(row => (
+            <div key={row.action} className="px-3 py-1.5">
+              <div className="mb-1 text-[11px] font-medium text-ink-muted">{ACTION_LABEL[row.action]}</div>
+              <div className="flex flex-wrap gap-1">
+                {row.providers.map(p => {
+                  const active = p.id === row.active
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => pick(row.action, p)}
+                      disabled={p.status !== 'UP'}
+                      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11.5px] transition-colors disabled:opacity-40 ${
+                        active
+                          ? 'border-accent bg-surface text-ink'
+                          : 'border-line text-ink-muted hover:bg-surface'
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'UP' ? 'bg-done' : 'bg-discard'}`} />
+                      <span>{p.label}</span>
+                      {active && <span className="font-mono text-[9px] text-accent">active</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           ))}
           {error && <div className="px-3 py-2 text-[11.5px] text-discard">{error}</div>}
         </div>
