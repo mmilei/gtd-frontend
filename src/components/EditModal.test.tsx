@@ -125,6 +125,25 @@ describe('area select', () => {
   })
 })
 
+describe('tag editing on an existing task (G8)', () => {
+  it('adds a new tag and removes an existing one, persisting the full set via patchMeta', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: ['errands', 'home'] })
+
+    await screen.findByPlaceholderText('Title')
+    // remove the "errands" pill
+    await user.click(screen.getByRole('button', { name: 'Remove errands' }))
+    // add a new "urgent" pill
+    await user.type(screen.getByPlaceholderText('+ tag'), 'urgent{enter}')
+    expect(screen.getByText('Discard changes')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Save'))
+    await screen.findByText('Saved ✓')
+
+    expect(patchMeta).toHaveBeenCalledWith('t.md', expect.objectContaining({ tags: ['home', 'urgent'] }))
+  })
+})
+
 describe('creating a new task (file=null)', () => {
   function renderNewModal() {
     return render(
