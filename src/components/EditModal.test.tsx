@@ -12,9 +12,10 @@ vi.mock('../lib/api', () => ({
   markDone: vi.fn(),
   dismissItem: vi.fn(),
   markdownifyItem: vi.fn(),
+  chat: vi.fn(),
 }))
 
-import { fetchItem, patchMeta } from '../lib/api'
+import { chat, fetchItem, moveItem, patchMeta } from '../lib/api'
 
 const AREAS = ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 
@@ -121,5 +122,63 @@ describe('area select', () => {
     const select = screen.getByLabelText('Area') as HTMLSelectElement
     expect(select.value).toBe('trabajo')
     expect(screen.getByRole('option', { name: 'trabajo (legacy)' })).toBeInTheDocument()
+  })
+})
+
+describe('creating a new task (file=null)', () => {
+  function renderNewModal() {
+    return render(
+      <EditModal
+        file={null}
+        tagSuggestions={[]}
+        projectSuggestions={[]}
+        locationSuggestions={[]}
+        areaOptions={AREAS}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+  }
+
+  it('opens blank, with no fetch, and "Save as new" instead of "Save"', () => {
+    renderNewModal()
+    expect(fetchItem).not.toHaveBeenCalled()
+    expect(screen.getByPlaceholderText('Title')).toHaveValue('')
+    expect(screen.getByText('Save as new')).toBeInTheDocument()
+    // Done/Discard/Improve act on a persisted file — hidden until one exists
+    expect(screen.queryByText('Done')).not.toBeInTheDocument()
+  })
+
+  it('bootstraps the file via chat(title), then patches bucket and fields the user set by hand', async () => {
+    const user = userEvent.setup()
+    vi.mocked(chat).mockResolvedValue({
+      fallback: false,
+      ops: [{ op: 'create', filed: true, bucket: 'backlog', file: 'new-task.md', title: 'Water the plants' }],
+    })
+    vi.mocked(moveItem).mockResolvedValue({ file: 'new-task.md', bucket: 'today' })
+    vi.mocked(patchMeta).mockResolvedValue({ file: 'new-task.md' })
+
+    renderNewModal()
+    await user.type(screen.getByPlaceholderText('Title'), 'Water the plants')
+    // classifier defaulted the modal's own bucket state to backlog; move it to today by hand
+    await user.click(screen.getByRole('button', { name: 'Today' }))
+    await user.click(screen.getByText('Save as new'))
+
+    await waitFor(() => expect(patchMeta).toHaveBeenCalled())
+    expect(chat).toHaveBeenCalledWith('Water the plants')
+    expect(moveItem).toHaveBeenCalledWith('new-task.md', 'today', null)
+    expect(patchMeta).toHaveBeenCalledWith('new-task.md', expect.objectContaining({ title: 'Water the plants' }))
+  })
+
+  it('surfaces an error and stays open if the classifier never files the task', async () => {
+    const user = userEvent.setup()
+    vi.mocked(chat).mockResolvedValue({ fallback: false, ops: [{ op: 'create', filed: false, message: 'No archivado.' }] })
+
+    renderNewModal()
+    await user.type(screen.getByPlaceholderText('Title'), 'do it now')
+    await user.click(screen.getByText('Save as new'))
+
+    await screen.findByText('Error — retry')
+    expect(patchMeta).not.toHaveBeenCalled()
   })
 })
