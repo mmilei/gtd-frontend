@@ -1,10 +1,10 @@
 import { Check, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { chat, dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
+import { createItem, dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
-import type { Bucket, Item, Op, Priority } from '../lib/types'
+import type { Bucket, Item, Priority } from '../lib/types'
 import { Overlay } from './Overlay'
 import { PillEditor } from './PillEditor'
 
@@ -188,42 +188,24 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     }
   }
 
-  /**
-   * There's no direct "create item" endpoint on the backend — filing a task only ever happens
-   * through POST /chat (the classifier). Bootstrap the file through it with just the title, then
-   * patch every field the user set by hand into place with the same endpoints `save()` uses for
-   * edits, so what lands on disk matches the form exactly regardless of what the classifier guessed.
-   */
+  /** POST /api/items writes the file directly with exactly the fields set here — no classifier call. */
   async function saveAsNew() {
-    if (!title.trim()) return
+    if (!title.trim() || !bucket) return
     setSaving(true)
     setSaveLabel('Saving…')
     try {
-      const { ops } = await chat(title.trim())
-      const created = ops.find(
-        (o): o is Op & { file: string } => o.op === 'create' && !!o.filed && !!o.file,
-      )
-      if (!created) {
-        throw new Error(ops[0]?.message || 'The server could not file this task — try a different title.')
-      }
-      const file = created.file
-
-      if (bucket && bucket !== created.bucket) {
-        await moveItem(file, bucket, bucket === 'today' ? due || null : null)
-      }
-      if (body.trim()) await replaceBody(file, body)
-
-      const meta: Partial<Item> = { title: title.trim() }
-      if (tags.length > 0) meta.tags = tags
-      if (people.length > 0) meta.related_people = people
-      if (due) meta.due = due
-      if (area) meta.area = area
-      if (project.trim()) meta.project = project.trim()
-      if (location.trim()) meta.location = location.trim()
+      const item: Partial<Item> & { bucket: Bucket; title: string } = { bucket, title: title.trim() }
+      if (body.trim()) item.body = body
+      if (tags.length > 0) item.tags = tags
+      if (people.length > 0) item.related_people = people
+      if (due) item.due = due
+      if (area) item.area = area
+      if (project.trim()) item.project = project.trim()
+      if (location.trim()) item.location = location.trim()
       const estimateNum = normEstimate(estimate)
-      if (estimateNum != null) meta.estimate_minutes = estimateNum
-      if (priority) meta.priority = priority
-      await patchMeta(file, meta)
+      if (estimateNum != null) item.estimate_minutes = estimateNum
+      if (priority) item.priority = priority
+      await createItem(item)
 
       setSaveLabel('Saved ✓')
       onSaved()

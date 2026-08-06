@@ -97,6 +97,21 @@ export async function chat(message: string): Promise<ChatResponse> {
   return { fallback: false, ops: [{ op: 'create', filed: true, bucket, title, file }] }
 }
 
+export async function createItem(
+  item: Partial<Item> & { bucket: Bucket; title: string },
+): Promise<{ filed: boolean; file: string; bucket: string; title: string }> {
+  const file = makeFilename(item.title)
+  state[item.bucket].unshift({
+    ...item,
+    file,
+    tags: item.tags ?? [],
+    body: item.body ?? '',
+    created: todayStr(),
+    ...(item.bucket === 'today' ? { today_since: todayStr() } : {}),
+  })
+  return { filed: true, file, bucket: item.bucket, title: item.title }
+}
+
 export async function getBuckets(): Promise<BucketsMap> {
   return Object.fromEntries(
     Object.entries(state).map(([k, v]) => [k, v.map(i => ({ ...i }))]),
@@ -249,7 +264,7 @@ export async function selectProvider(action: LlmAction, provider: string): Promi
 // fails to compile — instead of the drift only surfacing as a runtime "X is not a function"
 // crash under VITE_MOCK=true.
 const _contract: typeof RealApi = {
-  chat, getBuckets, getBucket, getToday, getUnconfirmed, getAreas, fetchItem, markDone, dismissItem,
+  chat, createItem, getBuckets, getBucket, getToday, getUnconfirmed, getAreas, fetchItem, markDone, dismissItem,
   moveItem, patchMeta, replaceBody, markdownifyItem, getReview, undo,
   confirmChatOp, confirmItem, getChatHistory, getEvents, transcribe,
   getProviders, selectProvider,

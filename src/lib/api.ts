@@ -1,4 +1,4 @@
-import type { BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData } from './types'
+import type { Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData } from './types'
 
 const BASE = '/api'
 
@@ -62,6 +62,13 @@ export function getAreas(): Promise<string[]> {
 
 export function fetchItem(filename: string): Promise<Item> {
   return request(`/items/${encodeURIComponent(filename)}`)
+}
+
+/** Files a task straight from user-entered fields — no classifier call, unlike chat(). */
+export function createItem(
+  item: Partial<Item> & { bucket: Bucket; title: string },
+): Promise<{ filed: boolean; file: string; bucket: string; title: string }> {
+  return request('/items', json(item))
 }
 
 export function markDone(filename: string): Promise<Item> {

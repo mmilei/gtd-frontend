@@ -12,10 +12,10 @@ vi.mock('../lib/api', () => ({
   markDone: vi.fn(),
   dismissItem: vi.fn(),
   markdownifyItem: vi.fn(),
-  chat: vi.fn(),
+  createItem: vi.fn(),
 }))
 
-import { chat, fetchItem, moveItem, patchMeta } from '../lib/api'
+import { createItem, fetchItem, moveItem, patchMeta } from '../lib/api'
 
 const AREAS = ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 
@@ -168,36 +168,32 @@ describe('creating a new task (file=null)', () => {
     expect(screen.queryByText('Done')).not.toBeInTheDocument()
   })
 
-  it('bootstraps the file via chat(title), then patches bucket and fields the user set by hand', async () => {
+  it('files the task in one direct call, no classifier involved', async () => {
     const user = userEvent.setup()
-    vi.mocked(chat).mockResolvedValue({
-      fallback: false,
-      ops: [{ op: 'create', filed: true, bucket: 'backlog', file: 'new-task.md', title: 'Water the plants' }],
-    })
-    vi.mocked(moveItem).mockResolvedValue({ file: 'new-task.md', bucket: 'today' })
-    vi.mocked(patchMeta).mockResolvedValue({ file: 'new-task.md' })
+    vi.mocked(createItem).mockResolvedValue({ filed: true, file: 'new-task.md', bucket: 'today', title: 'Water the plants' })
 
     renderNewModal()
     await user.type(screen.getByPlaceholderText('Title'), 'Water the plants')
-    // classifier defaulted the modal's own bucket state to backlog; move it to today by hand
+    // modal defaults to backlog; move it to today by hand
     await user.click(screen.getByRole('button', { name: 'Today' }))
     await user.click(screen.getByText('Save as new'))
 
-    await waitFor(() => expect(patchMeta).toHaveBeenCalled())
-    expect(chat).toHaveBeenCalledWith('Water the plants')
-    expect(moveItem).toHaveBeenCalledWith('new-task.md', 'today', null)
-    expect(patchMeta).toHaveBeenCalledWith('new-task.md', expect.objectContaining({ title: 'Water the plants' }))
+    await waitFor(() => expect(createItem).toHaveBeenCalled())
+    expect(createItem).toHaveBeenCalledWith(
+      expect.objectContaining({ bucket: 'today', title: 'Water the plants' }),
+    )
+    expect(moveItem).not.toHaveBeenCalled()
+    expect(patchMeta).not.toHaveBeenCalled()
   })
 
-  it('surfaces an error and stays open if the classifier never files the task', async () => {
+  it('surfaces an error and stays open if the server rejects the create', async () => {
     const user = userEvent.setup()
-    vi.mocked(chat).mockResolvedValue({ fallback: false, ops: [{ op: 'create', filed: false, message: 'No archivado.' }] })
+    vi.mocked(createItem).mockRejectedValue(new Error('bucket must be one of ...'))
 
     renderNewModal()
     await user.type(screen.getByPlaceholderText('Title'), 'do it now')
     await user.click(screen.getByText('Save as new'))
 
     await screen.findByText('Error — retry')
-    expect(patchMeta).not.toHaveBeenCalled()
   })
 })
