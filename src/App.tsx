@@ -63,6 +63,8 @@ export default function App() {
   const [feed, setFeed] = useState<FeedEntry[]>([])
   const [capturing, setCapturing] = useState(false)
   const [editingFile, setEditingFile] = useState<string | null>(null)
+  // Opens EditModal in "new task" mode (file=null) instead of loading an existing one.
+  const [creatingNew, setCreatingNew] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [facetView, setFacetView] = useState<{ facet: Facet; value: string } | null>(null)
   // Remembers the facet view an item was opened from, so closing EditModal can return to it
@@ -280,6 +282,7 @@ export default function App() {
         onOpenReview={() => setReviewOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenUnconfirmed={() => setUnconfirmedOpen(true)}
+        onNewTask={() => setCreatingNew(true)}
         unconfirmedCount={unconfirmedCount}
       />
       <div className="flex min-h-0 flex-1">
@@ -316,15 +319,16 @@ export default function App() {
         </main>
       </div>
 
-      {editingFile && (
+      {(editingFile || creatingNew) && (
         <EditModal
-          file={editingFile}
+          file={creatingNew ? null : editingFile}
           tagSuggestions={tagSuggestions}
           projectSuggestions={projectSuggestions}
           locationSuggestions={locationSuggestions}
           areaOptions={areaOptions}
           onClose={() => {
             setEditingFile(null)
+            setCreatingNew(false)
             if (returnToFacetRef.current) {
               setFacetView(returnToFacetRef.current)
               returnToFacetRef.current = null

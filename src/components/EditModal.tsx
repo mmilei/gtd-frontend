@@ -1,6 +1,6 @@
 import { Check, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
+import { createItem, dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
@@ -9,7 +9,8 @@ import { Overlay } from './Overlay'
 import { PillEditor } from './PillEditor'
 
 interface Props {
-  file: string
+  /** null opens the modal in "new task" mode: blank fields, no fetch, "Save as new" instead of "Save". */
+  file: string | null
   tagSuggestions: string[]
   projectSuggestions: string[]
   locationSuggestions: string[]
@@ -36,12 +37,14 @@ const sameSet = (a: string[], b: string[]) =>
 const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
 
 export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved }: Props) {
+  const isNew = file === null
+
   const [original, setOriginal] = useState<Item | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
 
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
-  const [bucket, setBucket] = useState<Bucket | null>(null)
+  const [bucket, setBucket] = useState<Bucket | null>(isNew ? 'backlog' : null)
   const [tags, setTags] = useState<string[]>([])
   const [people, setPeople] = useState<string[]>([])
   const [due, setDue] = useState('')
@@ -52,11 +55,12 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const [priority, setPriority] = useState<Priority | ''>('')
 
   const [saving, setSaving] = useState(false)
-  const [saveLabel, setSaveLabel] = useState('Save')
+  const [saveLabel, setSaveLabel] = useState(isNew ? 'Save as new' : 'Save')
   const [improving, setImproving] = useState(false)
   const [confirmingDiscard, setConfirmingDiscard] = useState(false)
 
   useEffect(() => {
+    if (file === null) return // new-task mode: nothing to fetch, fields start blank
     let cancelled = false
     fetchItem(file)
       .then(item => {
@@ -83,6 +87,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const userTags = useMemo(() => tags.filter(t => !SYSTEM_TAGS.has(t)), [tags])
 
   const dirty = useMemo(() => {
+    if (isNew) return title.trim() !== '' || body.trim() !== ''
     if (!original) return false
     return (
       title !== (original.title ?? file) ||
@@ -97,7 +102,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       normEstimate(estimate) !== (original.estimate_minutes ?? null) ||
       (priority || null) !== (original.priority ?? null)
     )
-  }, [original, file, title, body, bucket, tags, people, due, area, project, location, estimate, priority])
+  }, [isNew, original, file, title, body, bucket, tags, people, due, area, project, location, estimate, priority])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -107,6 +112,20 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   /** Throw away edits and restore the just-opened state — the modal stays open. */
   function resetFromOriginal() {
     setConfirmingDiscard(false)
+    if (isNew) {
+      setTitle('')
+      setBody('')
+      setBucket('backlog')
+      setTags([])
+      setPeople([])
+      setDue('')
+      setArea('')
+      setProject('')
+      setLocation('')
+      setEstimate('')
+      setPriority('')
+      return
+    }
     if (!original) {
       onClose()
       return
@@ -125,7 +144,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   }
 
   async function save() {
-    if (!original) return
+    if (isNew || !original) return
     setSaving(true)
     setSaveLabel('Saving…')
     try {
@@ -169,7 +188,38 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     }
   }
 
+  /** POST /api/items writes the file directly with exactly the fields set here — no classifier call. */
+  async function saveAsNew() {
+    if (!title.trim() || !bucket) return
+    setSaving(true)
+    setSaveLabel('Saving…')
+    try {
+      const item: Partial<Item> & { bucket: Bucket; title: string } = { bucket, title: title.trim() }
+      if (body.trim()) item.body = body
+      if (tags.length > 0) item.tags = tags
+      if (people.length > 0) item.related_people = people
+      if (due) item.due = due
+      if (area) item.area = area
+      if (project.trim()) item.project = project.trim()
+      if (location.trim()) item.location = location.trim()
+      const estimateNum = normEstimate(estimate)
+      if (estimateNum != null) item.estimate_minutes = estimateNum
+      if (priority) item.priority = priority
+      await createItem(item)
+
+      setSaveLabel('Saved ✓')
+      onSaved()
+      onClose()
+    } catch {
+      setSaveLabel('Error — retry')
+      setSaving(false)
+    }
+    // no `finally { setSaving(false) }`: the success path calls onClose(), which unmounts this
+    // component — resetting state after that would be a no-op update on an unmounted component.
+  }
+
   async function improve() {
+    if (isNew) return
     setImproving(true)
     try {
       const result = await markdownifyItem(file)
@@ -193,7 +243,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   }
 
   return (
-    <Overlay title={loadFailed ? file : 'Edit'} onClose={requestClose} wide>
+    <Overlay title={isNew ? 'New task' : loadFailed ? file : 'Edit'} onClose={requestClose} wide>
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-wrap gap-1.5">
           {BUCKET_ORDER.map(b => {
@@ -227,7 +277,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           value={body}
           onChange={e => setBody(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) save()
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) (isNew ? saveAsNew() : save())
           }}
           spellCheck={false}
           rows={8}
@@ -385,35 +435,39 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           </div>
         ) : (
           <div className="flex items-center gap-2 border-t border-line pt-4">
-            <button
-              onClick={() => runAndClose(() => markDone(file))}
-              className="flex items-center gap-1.5 rounded-md border border-done/40 px-3 py-1.5 text-[12px] text-done transition-colors hover:bg-done/10"
-            >
-              <Check size={13} /> Done
-            </button>
-            <button
-              onClick={() => runAndClose(() => dismissItem(file))}
-              className="flex items-center gap-1.5 rounded-md border border-discard/40 px-3 py-1.5 text-[12px] text-discard transition-colors hover:bg-discard/10"
-            >
-              <Trash2 size={13} /> Discard
-            </button>
-            {bucket !== 'reference' && (
-              <button
-                onClick={improve}
-                disabled={improving || !!original?.markdownified}
-                title={original?.markdownified ? 'Already improved with AI' : 'Enrich with AI'}
-                className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-[12px] text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
-              >
-                <Sparkles size={13} /> {improving ? 'Improving…' : 'Improve'}
-              </button>
+            {!isNew && (
+              <>
+                <button
+                  onClick={() => runAndClose(() => markDone(file))}
+                  className="flex items-center gap-1.5 rounded-md border border-done/40 px-3 py-1.5 text-[12px] text-done transition-colors hover:bg-done/10"
+                >
+                  <Check size={13} /> Done
+                </button>
+                <button
+                  onClick={() => runAndClose(() => dismissItem(file))}
+                  className="flex items-center gap-1.5 rounded-md border border-discard/40 px-3 py-1.5 text-[12px] text-discard transition-colors hover:bg-discard/10"
+                >
+                  <Trash2 size={13} /> Discard
+                </button>
+                {bucket !== 'reference' && (
+                  <button
+                    onClick={improve}
+                    disabled={improving || !!original?.markdownified}
+                    title={original?.markdownified ? 'Already improved with AI' : 'Enrich with AI'}
+                    className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-[12px] text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
+                  >
+                    <Sparkles size={13} /> {improving ? 'Improving…' : 'Improve'}
+                  </button>
+                )}
+              </>
             )}
             <div className="flex-1" />
             <button onClick={requestClose} className="rounded-md px-3 py-1.5 text-[12px] text-ink-muted transition-colors hover:text-ink">
               {dirty ? 'Discard changes' : 'Cancel'}
             </button>
             <button
-              onClick={save}
-              disabled={saving || !original}
+              onClick={isNew ? saveAsNew : save}
+              disabled={saving || (isNew ? !title.trim() : !original)}
               className="rounded-md bg-accent px-4 py-1.5 text-[12px] font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               {saveLabel}

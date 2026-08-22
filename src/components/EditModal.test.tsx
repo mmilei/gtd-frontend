@@ -12,9 +12,10 @@ vi.mock('../lib/api', () => ({
   markDone: vi.fn(),
   dismissItem: vi.fn(),
   markdownifyItem: vi.fn(),
+  createItem: vi.fn(),
 }))
 
-import { fetchItem, patchMeta } from '../lib/api'
+import { createItem, fetchItem, moveItem, patchMeta } from '../lib/api'
 
 const AREAS = ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 
@@ -121,5 +122,78 @@ describe('area select', () => {
     const select = screen.getByLabelText('Area') as HTMLSelectElement
     expect(select.value).toBe('trabajo')
     expect(screen.getByRole('option', { name: 'trabajo (legacy)' })).toBeInTheDocument()
+  })
+})
+
+describe('tag editing on an existing task (G8)', () => {
+  it('adds a new tag and removes an existing one, persisting the full set via patchMeta', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: ['errands', 'home'] })
+
+    await screen.findByPlaceholderText('Title')
+    // remove the "errands" pill
+    await user.click(screen.getByRole('button', { name: 'Remove errands' }))
+    // add a new "urgent" pill
+    await user.type(screen.getByPlaceholderText('+ tag'), 'urgent{enter}')
+    expect(screen.getByText('Discard changes')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Save'))
+    await screen.findByText('Saved ✓')
+
+    expect(patchMeta).toHaveBeenCalledWith('t.md', expect.objectContaining({ tags: ['home', 'urgent'] }))
+  })
+})
+
+describe('creating a new task (file=null)', () => {
+  function renderNewModal() {
+    return render(
+      <EditModal
+        file={null}
+        tagSuggestions={[]}
+        projectSuggestions={[]}
+        locationSuggestions={[]}
+        areaOptions={AREAS}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    )
+  }
+
+  it('opens blank, with no fetch, and "Save as new" instead of "Save"', () => {
+    renderNewModal()
+    expect(fetchItem).not.toHaveBeenCalled()
+    expect(screen.getByPlaceholderText('Title')).toHaveValue('')
+    expect(screen.getByText('Save as new')).toBeInTheDocument()
+    // Done/Discard/Improve act on a persisted file — hidden until one exists
+    expect(screen.queryByText('Done')).not.toBeInTheDocument()
+  })
+
+  it('files the task in one direct call, no classifier involved', async () => {
+    const user = userEvent.setup()
+    vi.mocked(createItem).mockResolvedValue({ filed: true, file: 'new-task.md', bucket: 'today', title: 'Water the plants' })
+
+    renderNewModal()
+    await user.type(screen.getByPlaceholderText('Title'), 'Water the plants')
+    // modal defaults to backlog; move it to today by hand
+    await user.click(screen.getByRole('button', { name: 'Today' }))
+    await user.click(screen.getByText('Save as new'))
+
+    await waitFor(() => expect(createItem).toHaveBeenCalled())
+    expect(createItem).toHaveBeenCalledWith(
+      expect.objectContaining({ bucket: 'today', title: 'Water the plants' }),
+    )
+    expect(moveItem).not.toHaveBeenCalled()
+    expect(patchMeta).not.toHaveBeenCalled()
+  })
+
+  it('surfaces an error and stays open if the server rejects the create', async () => {
+    const user = userEvent.setup()
+    vi.mocked(createItem).mockRejectedValue(new Error('bucket must be one of ...'))
+
+    renderNewModal()
+    await user.type(screen.getByPlaceholderText('Title'), 'do it now')
+    await user.click(screen.getByText('Save as new'))
+
+    await screen.findByText('Error — retry')
   })
 })
