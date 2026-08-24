@@ -9,9 +9,10 @@ import { MarkdownEditor } from './MarkdownEditor'
 vi.mock('../lib/api', () => ({
   getPeople: vi.fn(),
   getPages: vi.fn(),
+  createPerson: vi.fn(),
 }))
 
-import { getPages, getPeople } from '../lib/api'
+import { createPerson, getPages, getPeople } from '../lib/api'
 
 const page = (name: string, kind: VaultPage['kind']): VaultPage => ({
   name,
@@ -26,6 +27,7 @@ const PAGES = [...PEOPLE, page('Write project README', 'TASK')]
 beforeEach(() => {
   vi.mocked(getPeople).mockReset().mockResolvedValue(PEOPLE)
   vi.mocked(getPages).mockReset().mockResolvedValue(PAGES)
+  vi.mocked(createPerson).mockReset().mockImplementation(name => Promise.resolve({ created: true, name }))
 })
 
 /**
@@ -183,6 +185,41 @@ describe('autocomplete', () => {
     await optionNamed('hardware')
     await accept(user)
     expect(doc()).toBe('[[Write project README]]\n#hardware')
+  })
+
+  it('offers to create a person only when the typed name matches nobody', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial="" />)
+
+    // A name the vault knows: the person is offered, creating one is not.
+    await type(user, '@Aug')
+    await optionNamed(/Augusto/)
+    expect(screen.queryByRole('option', { name: /create person/ })).toBeNull()
+
+    await user.keyboard('{Escape}')
+    await keys(user, ' @Zeb')
+
+    // Nobody matches, so the create option is the way out of the dead end.
+    await optionNamed(/create person "Zeb"/)
+    expect(screen.queryByRole('option', { name: /Augusto/ })).toBeNull()
+  })
+
+  it('creates the person and inserts the wikilink when the create option is picked', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial="" />)
+
+    await type(user, '@Zeb')
+    await optionNamed(/create person "Zeb"/)
+    await accept(user)
+
+    await waitFor(() => expect(doc()).toBe('[[Zeb]]'))
+    expect(createPerson).toHaveBeenCalledExactlyOnceWith('Zeb')
+    expect(outward()).toBe('[[Zeb]]')
+
+    // The list fetched on mount now knows them, so the same name stops offering to create it.
+    await keys(user, ' @Zeb')
+    await optionNamed(/^Zeb/)
+    expect(screen.queryByRole('option', { name: /create person/ })).toBeNull()
   })
 
   it('does not fetch again while typing after a trigger', async () => {

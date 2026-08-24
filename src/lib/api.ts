@@ -152,6 +152,15 @@ export function getPeople(): Promise<VaultPage[]> {
   return request('/people')
 }
 
+/**
+ * Creates a person page in brain/entities/ — what the editor's `@` autocomplete offers when what
+ * was typed matches nobody. A blank or already-taken name comes back as a 400 whose `error` the
+ * shared request() turns into the thrown message.
+ */
+export function createPerson(name: string): Promise<{ created: boolean; name: string }> {
+  return request('/people', json({ name }))
+}
+
 export function getPages(): Promise<VaultPage[]> {
   return request('/pages')
 }

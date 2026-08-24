@@ -277,6 +277,23 @@ export async function getPages(): Promise<VaultPage[]> {
   return MOCK_PAGES.map(p => ({ ...p }))
 }
 
+/** Same two rejections the backend enforces — a blank name, and one the vault already has. */
+export async function createPerson(name: string): Promise<{ created: boolean; name: string }> {
+  const person = name.trim()
+  if (!person) throw new Error('name is required')
+  const taken = MOCK_PEOPLE.find(p => p.name.toLowerCase() === person.toLowerCase())
+  if (taken) throw new Error(`Person already exists: ${taken.name}`)
+  const page: VaultPage = {
+    name: person,
+    kind: 'PERSON',
+    path: `brain/entities/${person}.md`,
+    obsidianUri: `obsidian://open?vault=vault&file=brain%2Fentities%2F${encodeURIComponent(person)}.md`,
+  }
+  MOCK_PEOPLE.push(page)
+  MOCK_PAGES.push(page)
+  return { created: true, name: person }
+}
+
 // Structural contract check: the Vite alias in vite.config.ts swaps this whole module in for
 // ./api at build time, and nothing else imports both, so nothing else lets TypeScript catch a
 // drift between them. If this module's exports stop matching api.ts's shape, this assignment
@@ -286,6 +303,6 @@ const _contract: typeof RealApi = {
   chat, createItem, getBuckets, getBucket, getToday, getUnconfirmed, getAreas, fetchItem, markDone, dismissItem,
   moveItem, patchMeta, replaceBody, markdownifyItem, getReview, undo,
   confirmChatOp, confirmItem, getChatHistory, getEvents, transcribe,
-  getProviders, selectProvider, getPeople, getPages,
+  getProviders, selectProvider, getPeople, getPages, createPerson,
 }
 void _contract

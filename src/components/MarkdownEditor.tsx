@@ -4,7 +4,7 @@ import { EditorState, Prec, RangeSetBuilder, StateField } from '@codemirror/stat
 import { Decoration, EditorView, WidgetType, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view'
 import { minimalSetup } from 'codemirror'
 import { useEffect, useRef } from 'react'
-import { getPages, getPeople } from '../lib/api'
+import { createPerson, getPages, getPeople } from '../lib/api'
 import type { VaultPage } from '../lib/types'
 
 /** `[[Target]]` on a single line — no nesting, no empty target. */
@@ -157,6 +157,49 @@ interface VaultOptions {
 }
 
 /**
+ * Does CodeMirror's own filter keep this option for `typed`? Its matcher accepts the typed
+ * characters in order with gaps allowed, so a subsequence test answers the same question — which
+ * is all "did anyone match?" below needs. `typed` comes in already lowercased.
+ */
+function matchesTyped(label: string, typed: string): boolean {
+  let i = 0
+  for (const ch of label.toLowerCase()) if (ch === typed[i]) i++
+  return i === typed.length
+}
+
+/**
+ * The last option after `@` when what was typed names nobody: creates the page, then inserts the
+ * same `[[Name]]` picking an existing person would have.
+ *
+ * The request fires on selection alone — the option itself is built from the list already in
+ * memory, so typing stays as free as it was before.
+ */
+function createPersonOption(name: string, vault: VaultOptions): Completion {
+  return {
+    // `label` is what CodeMirror filters and matches against, so it has to be the typed text
+    // itself or the option would filter itself out; `displayLabel` is what the dropdown shows.
+    label: name,
+    displayLabel: `create person "${name}"`,
+    detail: 'new',
+    boost: -99,
+    apply: (view, _completion, from, to) => {
+      void createPerson(name)
+        .then(() => {
+          // The vault lists are fetched once per mount, so the new page has to be added by hand
+          // or the next `@` would offer to create the same person again.
+          vault.people = [...vault.people, { label: name, detail: 'person', apply: insertWikilink }]
+          // The document can have moved while the request was in flight; rewrite the trigger only
+          // if it is still exactly where the dropdown left it.
+          if (view.state.sliceDoc(from - 1, to) === `@${name}`) insertWikilink(view, { label: name }, from, to)
+        })
+        .catch(() => {
+          // Name taken, server down — the typed text is left alone and nothing is inserted.
+        })
+    },
+  }
+}
+
+/**
  * The three triggers, resolved entirely against data already in memory — the vault lists are
  * fetched once when the editor mounts and tags come in as a prop, so no keystroke can reach the
  * network. Returning `validFor` lets CodeMirror keep refiltering the same option array in the
@@ -167,7 +210,14 @@ function suggest(ctx: CompletionContext, vault: VaultOptions, tags: string[]): C
   if (page) return { from: page.from + 2, options: vault.pages, validFor: /^[^[\]\n]*$/ }
 
   const person = ctx.matchBefore(/@[^\s[\]@]*/)
-  if (person) return { from: person.from + 1, options: vault.people, validFor: /^[^\s[\]@]*$/ }
+  if (person) {
+    // No `validFor` on this one: the create option's label is the typed text, so it has to be
+    // rebuilt on every character. Still no request — this only re-reads the cached list.
+    const typed = person.text.slice(1)
+    const known = vault.people.some(o => matchesTyped(o.label, typed.toLowerCase()))
+    const options = typed && !known ? [...vault.people, createPersonOption(typed, vault)] : vault.people
+    return { from: person.from + 1, options }
+  }
 
   // A bare `#` is a markdown heading, so a tag only starts once there is something after it.
   const tag = ctx.matchBefore(/#[\w-]+/)
