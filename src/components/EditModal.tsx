@@ -283,6 +283,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           value={body}
           onChange={setBody}
           onSave={() => (isNew ? saveAsNew() : save())}
+          tagSuggestions={tagSuggestions}
           placeholder="Notes (markdown)"
         />
 

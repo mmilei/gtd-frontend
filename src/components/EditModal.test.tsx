@@ -13,6 +13,9 @@ vi.mock('../lib/api', () => ({
   dismissItem: vi.fn(),
   markdownifyItem: vi.fn(),
   createItem: vi.fn(),
+  // MarkdownEditor loads the autocomplete sources when it mounts inside the modal.
+  getPeople: vi.fn(async () => []),
+  getPages: vi.fn(async () => []),
 }))
 
 import { createItem, fetchItem, moveItem, patchMeta, replaceBody } from '../lib/api'

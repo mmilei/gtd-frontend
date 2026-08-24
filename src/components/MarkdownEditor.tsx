@@ -1,8 +1,11 @@
+import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState, Prec, RangeSetBuilder, StateField } from '@codemirror/state'
 import { Decoration, EditorView, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view'
 import { minimalSetup } from 'codemirror'
 import { useEffect, useRef } from 'react'
+import { getPages, getPeople } from '../lib/api'
+import type { VaultPage } from '../lib/types'
 
 /** `[[Target]]` on a single line — no nesting, no empty target. */
 const WIKILINK = /\[\[[^[\]\n]+\]\]/g
@@ -50,6 +53,50 @@ const wikilinks = StateField.define<DecorationSet>({
 })
 
 /**
+ * Selecting a person (`@`) or a page (`[[`) always writes a `[[Name]]` wikilink.
+ *
+ * `from` is the position after the trigger — that is what CodeMirror filters the typed text
+ * against — so the insert has to reach back over the trigger itself to swallow it.
+ */
+function insertWikilink(view: EditorView, completion: Completion, from: number, to: number) {
+  const trigger = view.state.sliceDoc(Math.max(0, from - 2), from) === '[[' ? 2 : 1
+  const insert = `[[${completion.label}]]`
+  view.dispatch({
+    changes: { from: from - trigger, to, insert },
+    selection: { anchor: from - trigger + insert.length },
+    userEvent: 'input.complete',
+  })
+}
+
+const asLinkOptions = (pages: VaultPage[]): Completion[] =>
+  pages.map(p => ({ label: p.name, detail: p.kind.toLowerCase(), apply: insertWikilink }))
+
+interface VaultOptions {
+  people: Completion[]
+  pages: Completion[]
+}
+
+/**
+ * The three triggers, resolved entirely against data already in memory — the vault lists are
+ * fetched once when the editor mounts and tags come in as a prop, so no keystroke can reach the
+ * network. Returning `validFor` lets CodeMirror keep refiltering the same option array in the
+ * browser instead of even calling this source again on the following characters.
+ */
+function suggest(ctx: CompletionContext, vault: VaultOptions, tags: string[]): CompletionResult | null {
+  const page = ctx.matchBefore(/\[\[[^[\]\n]*/)
+  if (page) return { from: page.from + 2, options: vault.pages, validFor: /^[^[\]\n]*$/ }
+
+  const person = ctx.matchBefore(/@[^\s[\]@]*/)
+  if (person) return { from: person.from + 1, options: vault.people, validFor: /^[^\s[\]@]*$/ }
+
+  // A bare `#` is a markdown heading, so a tag only starts once there is something after it.
+  const tag = ctx.matchBefore(/#[\w-]+/)
+  if (tag) return { from: tag.from + 1, options: tags.map(label => ({ label })), validFor: /^[\w-]*$/ }
+
+  return null
+}
+
+/**
  * Only tokens from src/styles/app.css — no CodeMirror palette leaks in.
  *
  * `.cm-content span { color: inherit }` is the one non-obvious rule: `minimalSetup` ships
@@ -92,6 +139,30 @@ const editorTheme = EditorView.theme(
     // (0,2,2) — outranks the `.cm-content span` reset above, per the note there
     '.cm-content span.cm-wikilink': { color: 'var(--color-accent)' },
     '.cm-content .cm-placeholder': { color: 'var(--color-ink-faint)' },
+    // Suggestion dropdown — same card surface as the modal's own controls, not CodeMirror's
+    // default light-grey list.
+    '.cm-tooltip.cm-tooltip-autocomplete': {
+      background: 'var(--color-raised)',
+      border: '1px solid var(--color-line-strong)',
+      borderRadius: 'var(--radius-card)',
+      overflow: 'hidden',
+    },
+    '.cm-tooltip-autocomplete > ul': {
+      fontFamily: 'var(--font-mono)',
+      fontSize: '12px',
+      maxHeight: '13em',
+    },
+    '.cm-tooltip-autocomplete > ul > li': {
+      padding: '3px 10px',
+      color: 'var(--color-ink-muted)',
+      lineHeight: '1.6',
+    },
+    '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+      background: 'var(--color-accent-soft)',
+      color: 'var(--color-ink)',
+    },
+    '.cm-completionMatchedText': { textDecoration: 'none', color: 'var(--color-accent)' },
+    '.cm-completionDetail': { marginLeft: '0.75em', color: 'var(--color-ink-faint)', fontStyle: 'normal' },
   },
   { dark: true },
 )
@@ -101,14 +172,35 @@ export interface MarkdownEditorProps {
   onChange: (value: string) => void
   /** Ctrl/Cmd+Enter — the save shortcut the textarea carried. */
   onSave: () => void
+  /** Tags the app already has in memory, offered after `#`. */
+  tagSuggestions?: string[]
   placeholder?: string
   className?: string
 }
 
 /** Controlled CodeMirror 6 editor: same `value`/`onChange` contract as the textarea it replaces. */
-export function MarkdownEditor({ value, onChange, onSave, placeholder = '', className }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, onSave, tagSuggestions = [], placeholder = '', className }: MarkdownEditorProps) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
+  const vault = useRef<VaultOptions>({ people: [], pages: [] })
+  const tagsRef = useRef(tagSuggestions)
+  tagsRef.current = tagSuggestions
+
+  // The only network call this component makes: one round of vault lists per mount, read through a
+  // ref by the completion source. Typing after a trigger filters that cached array in the browser.
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([getPeople(), getPages()])
+      .then(([people, pages]) => {
+        if (!cancelled) vault.current = { people: asLinkOptions(people), pages: asLinkOptions(pages) }
+      })
+      .catch(() => {
+        // No suggestions is a fine degraded state — the editor itself keeps working.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   // Handlers are read through refs so the extension set is built once: rebuilding it on every
   // parent render would tear down the editor (and the cursor) on each keystroke.
   const onChangeRef = useRef(onChange)
@@ -129,6 +221,10 @@ export function MarkdownEditor({ value, onChange, onSave, placeholder = '', clas
           minimalSetup,
           markdown(),
           wikilinks,
+          autocompletion({
+            icons: false,
+            override: [ctx => suggest(ctx, vault.current, tagsRef.current)],
+          }),
           EditorView.lineWrapping,
           // CodeMirror renders the placeholder as aria-placeholder, which is not an accessible-name
           // source — so the label has to be set too, or the textbox ends up nameless where the

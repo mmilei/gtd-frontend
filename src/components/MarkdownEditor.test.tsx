@@ -1,20 +1,49 @@
 import { EditorView } from '@codemirror/view'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { act, useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { VaultPage } from '../lib/types'
 import { MarkdownEditor } from './MarkdownEditor'
+
+vi.mock('../lib/api', () => ({
+  getPeople: vi.fn(),
+  getPages: vi.fn(),
+}))
+
+import { getPages, getPeople } from '../lib/api'
+
+const page = (name: string, kind: VaultPage['kind']): VaultPage => ({
+  name,
+  kind,
+  path: `brain/${name}.md`,
+  obsidianUri: `obsidian://open?file=${name}`,
+})
+
+const PEOPLE = [page('Augusto', 'PERSON'), page('Bruno', 'PERSON')]
+const PAGES = [...PEOPLE, page('Write project README', 'TASK')]
+
+beforeEach(() => {
+  vi.mocked(getPeople).mockReset().mockResolvedValue(PEOPLE)
+  vi.mocked(getPages).mockReset().mockResolvedValue(PAGES)
+})
 
 /**
  * Mirrors how EditModal drives the editor: the value it hands back through `onChange` is exactly
  * what would reach `setBody`/`replaceBody`, so asserting on `data-testid="outward"` asserts on the
  * text that would be saved to the vault.
  */
-function Harness({ initial }: { initial: string }) {
+function Harness({ initial, tags = [] }: { initial: string; tags?: string[] }) {
   const [value, setValue] = useState(initial)
   return (
     <>
-      <MarkdownEditor value={value} onChange={setValue} onSave={() => {}} placeholder="Notes (markdown)" />
+      <MarkdownEditor
+        value={value}
+        onChange={setValue}
+        onSave={() => {}}
+        tagSuggestions={tags}
+        placeholder="Notes (markdown)"
+      />
       <output data-testid="outward">{value}</output>
     </>
   )
@@ -28,11 +57,15 @@ const doc = () => EditorView.findFromDOM(editor() as HTMLElement)?.state.doc.toS
 
 // One key per await, as in EditModal.test.tsx: CodeMirror picks synthetic typing up through a
 // MutationObserver, and a burst outruns that flush under jsdom.
-async function type(user: ReturnType<typeof userEvent.setup>, text: string) {
-  await user.click(editor())
+async function keys(user: ReturnType<typeof userEvent.setup>, text: string) {
   for (const char of text) {
     await user.keyboard(char.replace(/[{[]/g, '$&$&'))
   }
+}
+
+async function type(user: ReturnType<typeof userEvent.setup>, text: string) {
+  await user.click(editor())
+  await keys(user, text)
 }
 
 describe('wikilink decorations', () => {
@@ -70,5 +103,68 @@ describe('wikilink decorations', () => {
     expect(editor().textContent).toContain('[[Target]]')
     expect(doc()).toBe('first line\n[[Target]]')
     expect(outward()).toBe('first line\n[[Target]]')
+  })
+})
+
+/** The suggestion list CodeMirror renders — `li[role=option]` inside the autocomplete tooltip. */
+const optionNamed = (name: string | RegExp) => screen.findByRole('option', { name })
+
+/**
+ * @codemirror/autocomplete drops Enter for the first `interactionDelay` (75ms) after the dropdown
+ * opens — its guard against accepting a suggestion the user never saw.
+ */
+async function accept(user: ReturnType<typeof userEvent.setup>) {
+  await new Promise(resolve => setTimeout(resolve, 100))
+  await user.keyboard('{Enter}')
+}
+
+describe('autocomplete', () => {
+  it('inserts [[Name]] when a person is picked from the @ suggestions', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial="" />)
+
+    await type(user, '@Aug')
+    await optionNamed(/Augusto/)
+    await accept(user)
+
+    // The `@` and everything typed after it are replaced by the wikilink the vault understands.
+    expect(doc()).toBe('[[Augusto]]')
+    expect(outward()).toBe('[[Augusto]]')
+  })
+
+  it('offers pages after [[ and tags after #', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial="" tags={['home', 'hardware']} />)
+
+    await type(user, '[[Write')
+    await optionNamed(/Write project README/)
+    await accept(user)
+    expect(doc()).toBe('[[Write project README]]')
+
+    await user.keyboard('{Enter}')
+    await keys(user, '#hard')
+    await optionNamed('hardware')
+    await accept(user)
+    expect(doc()).toBe('[[Write project README]]\n#hardware')
+  })
+
+  it('does not fetch again while typing after a trigger', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial="" />)
+
+    // One round of vault lists on mount, before any key is pressed.
+    await waitFor(() => expect(getPeople).toHaveBeenCalledTimes(1))
+    expect(getPages).toHaveBeenCalledTimes(1)
+
+    await type(user, '@Augus')
+    await optionNamed(/Augusto/)
+    await user.keyboard('{Escape}')
+    await user.keyboard('{Enter}')
+    await keys(user, '[[Writ')
+    await optionNamed(/Write project README/)
+
+    // Filtering happens in the browser over the cached lists — the counts must not have moved.
+    expect(getPeople).toHaveBeenCalledTimes(1)
+    expect(getPages).toHaveBeenCalledTimes(1)
   })
 })
