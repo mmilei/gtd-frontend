@@ -1,5 +1,6 @@
 import { Check, Play, X } from 'lucide-react'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { PRIORITY_META } from '../lib/priorityMeta'
 import { playBoink, playThunk } from '../lib/sound'
 import { formatMinutes } from '../lib/todayOrder'
@@ -19,12 +20,58 @@ interface Props {
   onFocus?: (item: Item) => void
 }
 
-function bodySnippet(body?: string): string {
+/** Characters kept in the collapsed card. Past this the "Show more" toggle appears. */
+const SNIPPET_CHARS = 140
+
+/**
+ * Body as a single flowing paragraph: block syntax (headings, bullets) is dropped down to its text
+ * so the card stays two scannable lines. Inline syntax is left in place for `renderInline`.
+ */
+export function flattenBody(body?: string): string {
   if (!body) return ''
-  const line = body.split('\n').find(l => l.trim() && !/^#+\s/.test(l) && !/^[-*]\s/.test(l))
-  if (!line) return ''
-  const t = line.trim()
-  return t.slice(0, 80) + (t.length > 80 ? '…' : '')
+  return body
+    .split('\n')
+    .map(l => l.replace(/^\s*(?:#{1,6}|[-*+]|>)\s+/, '').trim())
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** `**bold**`, `` `code` `` and `[[wikilink]]` — the only markdown the card renders. */
+const INLINE = /\*\*([^*\n]+)\*\*|`([^`\n]+)`|\[\[([^[\]\n]+)\]\]/g
+
+/**
+ * Renders the inline subset above. Deliberately not a markdown renderer: the card shows a preview,
+ * so anything not matched by `INLINE` stays literal text.
+ */
+export function renderInline(text: string): ReactNode[] {
+  const out: ReactNode[] = []
+  let last = 0
+  for (const m of text.matchAll(INLINE)) {
+    if (m.index > last) out.push(text.slice(last, m.index))
+    if (m[1] != null) {
+      out.push(
+        <strong key={m.index} className="font-semibold text-ink">
+          {m[1]}
+        </strong>,
+      )
+    } else if (m[2] != null) {
+      out.push(
+        <code key={m.index} className="rounded bg-raised px-1 font-mono text-[11px]">
+          {m[2]}
+        </code>,
+      )
+    } else {
+      // Same treatment as the editor's `.cm-wikilink`: accent-coloured target, brackets hidden.
+      out.push(
+        <span key={m.index} className="text-accent">
+          {m[3]}
+        </span>,
+      )
+    }
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
 }
 
 /**
@@ -44,6 +91,7 @@ function daysInToday(item: Item, bucket: Bucket): number {
 
 export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, onComplete, onDismiss, onFocus }: Props) {
   const [leaving, setLeaving] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   async function run(e: React.MouseEvent, action: (i: Item) => Promise<boolean>, sound?: () => void) {
     e.stopPropagation()
@@ -65,7 +113,8 @@ export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, 
 
   const title = item.title ?? item.file
   const tags = (item.tags ?? []).filter(t => !SYSTEM_TAGS.has(t))
-  const snippet = bodySnippet(item.body)
+  const body = flattenBody(item.body)
+  const expandable = body.length > SNIPPET_CHARS
   const age = daysInToday(item, bucket)
   const people = item.related_people ?? []
   const project = item.project?.trim()
@@ -145,7 +194,27 @@ export function ItemCard({ item, bucket, onOpen, onOpenProject, onOpenLocation, 
             {people.length > 0 && <span>{people.map(p => `@${p}`).join(' ')}</span>}
             {age >= 2 && <span className="text-ink-muted">{age}d in today</span>}
           </div>
-          {snippet && <div className="mt-1.5 truncate text-[12px] text-ink-muted">{snippet}</div>}
+          {body && (
+            <div className="mt-1.5 text-[12px] text-ink-muted">
+              {/* Collapsed is capped twice: the char cut keeps the DOM small, `line-clamp-2` keeps
+                  the row height fixed when the cut still wraps past two lines. */}
+              <div className={expanded ? '' : 'line-clamp-2'}>
+                {renderInline(expanded || !expandable ? body : body.slice(0, SNIPPET_CHARS) + '…')}
+              </div>
+              {expandable && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    setExpanded(v => !v)
+                  }}
+                  aria-expanded={expanded}
+                  className="mt-0.5 text-[11px] text-accent transition-colors hover:underline"
+                >
+                  {expanded ? 'Show less' : 'Show more'}
+                </button>
+              )}
+            </div>
+          )}
           {tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {tags.map(t => (
