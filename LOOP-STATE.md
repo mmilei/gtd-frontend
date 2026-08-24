@@ -1,7 +1,8 @@
 # LOOP-STATE — editor markdown + navegación por URL
 
 Spec completa: `brain/resources/gtd-frontend-spec-y-loop-kickoff.md` en el vault.
-Budget: 20 iteraciones (14 originales + ítem 0 de CI + 3 sumados el 24/08). Ejecución **secuencial**, un subagente Sonnet por vez.
+Budget: 20 iteraciones (14 originales + ítem 0 de CI + 3 sumados el 24/08).
+Ejecución **secuencial**, un subagente por vez. **Modelo por ítem, no por default** (tabla abajo).
 Rama base: **`develop`**. PR con `--base develop` explícito.
 
 **Loop protection:** 2 VERIFY fallidos seguidos en el mismo ítem → `BLOCKED`, seguir con el próximo.
@@ -9,6 +10,21 @@ Más de la mitad de los ítems `BLOCKED` → cortar la corrida.
 
 **El VERIFY lo corre el orquestador, nunca el agente que acaba de escribir el código.** Se verifica
 **actuando** (corriendo el comando), nunca leyendo. STATUS lleva output real, jamás "listo".
+
+## Modelo por ítem
+
+La tabla del skill asigna por tipo de tarea, no por corrida. Este loop tiene de las dos clases:
+
+| Ítems | Modelo | Por qué |
+|---|---|---|
+| 0, 5, 6, 7, 8, 14 | **Sonnet** | cambios ya especificados: un workflow, una opción de `fetch`, copiar un archivo en el build, dos funciones de API, un arm en un switch, sacar un componente |
+| 1, 2, 3, 4 | **Opus** | el patrón modal/página es arquitectura; el ítem 4 es refactor de comportamiento que hoy funciona |
+| 9, 10, 11, 12, 13 | **Opus** | CodeMirror 6 con React es donde un modelo más chico produce algo que pasa los tests y está mal: decoraciones que mutan el documento, listeners sin limpiar, `StateField` mal usado |
+| 16, 17, 18 | **Opus** | `depends_on` cruza dos repos; los otros dos llevan criterio visual |
+
+Corregido el 2026-08-24 tras la pregunta del usuario: la primera asignación era Sonnet para todo, que
+es aplicar mal la tabla. El post-mortem del 2026-08-05 (1,26M tokens, 6 agentes Opus) fue por usar
+Opus en tandas **mecánicas** — no es el caso acá.
 
 ## Contrato compartido (todos los ítems lo respetan)
 
