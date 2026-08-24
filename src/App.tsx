@@ -348,6 +348,7 @@ export default function App() {
             areaOptions={areaOptions}
             onClose={exitPage}
             onSaved={() => void refresh()}
+            onNavigate={navigate}
           />
         ) : pageMode && facetView ? (
           <FacetView
@@ -400,6 +401,7 @@ export default function App() {
           areaOptions={areaOptions}
           onClose={() => (creatingNew ? setCreatingNew(false) : back())}
           onSaved={() => void refresh()}
+          onNavigate={navigate}
         />
       )}
       {searchOpen && (

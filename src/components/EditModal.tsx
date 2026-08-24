@@ -1,10 +1,11 @@
-import { Check, Sparkles, Trash2 } from 'lucide-react'
+import { Check, FileText, Sparkles, SquareCheck, Trash2, User } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createItem, dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
-import type { Bucket, Item, Priority } from '../lib/types'
+import type { Bucket, Item, Priority, VaultPage } from '../lib/types'
+import { facetPath, itemPath, withBase } from '../state/useRoute'
 import { MarkdownEditor } from './MarkdownEditor'
 import { overlayFrame } from './Overlay'
 import type { Frame } from './Overlay'
@@ -22,6 +23,8 @@ export interface EditProps {
   onSaved: () => void
   /** Surface to render into — the modal dialog unless a standalone page frame is passed. */
   frame?: Frame
+  /** App-level navigation for the vault-link chips. Omitted: the links fall back to a full page load. */
+  onNavigate?: (to: string, options?: { modal?: boolean }) => void
 }
 
 const cleanTag = (t: string) =>
@@ -40,7 +43,57 @@ const sameSet = (a: string[], b: string[]) =>
 /** Same rounding `save` applies before persisting, so `dirty` doesn't flag e.g. "30.4" as changed when it would save as the already-current 30. */
 const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
 
-export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved, frame = overlayFrame }: EditProps) {
+const LINK_ICON = { TASK: SquareCheck, PERSON: User, NOTE: FileText }
+
+/**
+ * In-app route for a linked vault page, or null when the target isn't one of this app's URLs
+ * (a plain vault note lives only in Obsidian). The bucket segment comes from the vault path —
+ * cosmetic anyway, since parseRoute resolves a card by filename.
+ */
+function linkRoute(link: VaultPage): string | null {
+  if (link.kind === 'PERSON') return facetPath('person', link.name)
+  if (link.kind !== 'TASK') return null
+  const segments = link.path.split('/').filter(Boolean)
+  return itemPath(segments[segments.length - 2] ?? 'backlog', segments[segments.length - 1] ?? link.name)
+}
+
+/**
+ * The vault pages this item's body links to. Real anchors, so ctrl/middle-click and "open in new
+ * tab" work for free — only a plain left click is intercepted, and only when the target is an
+ * in-app route: obsidian:// links are left entirely to the browser.
+ */
+function VaultLinks({ links, onNavigate }: { links: VaultPage[]; onNavigate?: EditProps['onNavigate'] }) {
+  if (links.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Links</span>
+      <div className="flex flex-wrap gap-1.5">
+        {links.map(link => {
+          const to = linkRoute(link)
+          const Icon = LINK_ICON[link.kind]
+          return (
+            <a
+              key={`${link.kind}:${link.path}`}
+              href={to === null ? link.obsidianUri : withBase(to)}
+              onClick={e => {
+                if (to === null || !onNavigate) return
+                if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return
+                e.preventDefault()
+                onNavigate(to, { modal: true })
+              }}
+              className="flex items-center gap-1 rounded-full border border-line bg-raised px-2.5 py-0.5 text-[11.5px] text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+            >
+              <Icon size={11} className="shrink-0 text-ink-faint" />
+              {link.name}
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved, frame = overlayFrame, onNavigate }: EditProps) {
   const isNew = file === null
 
   const [original, setOriginal] = useState<Item | null>(null)
@@ -286,6 +339,8 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           tagSuggestions={tagSuggestions}
           placeholder="Notes (markdown)"
         />
+
+        <VaultLinks links={original?.links ?? []} onNavigate={onNavigate} />
 
         <div className="grid grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">

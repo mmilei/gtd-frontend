@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Item } from '../lib/types'
+import type { Item, VaultPage } from '../lib/types'
 import { EditModal } from './EditModal'
+import type { EditProps } from './EditModal'
 
 vi.mock('../lib/api', () => ({
   fetchItem: vi.fn(),
@@ -22,7 +23,7 @@ import { createItem, fetchItem, moveItem, patchMeta, replaceBody } from '../lib/
 
 const AREAS = ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 
-function renderModal(item: Item, areaOptions: string[] = AREAS) {
+function renderModal(item: Item, areaOptions: string[] = AREAS, onNavigate?: EditProps['onNavigate']) {
   vi.mocked(fetchItem).mockResolvedValue(item)
   vi.mocked(patchMeta).mockImplementation(async (_file, meta) => ({ ...item, ...meta }))
   return render(
@@ -34,6 +35,7 @@ function renderModal(item: Item, areaOptions: string[] = AREAS) {
       areaOptions={areaOptions}
       onClose={() => {}}
       onSaved={() => {}}
+      onNavigate={onNavigate}
     />,
   )
 }
@@ -188,6 +190,81 @@ describe('body editor (CodeMirror)', () => {
     // The default keymap binds Mod-Enter to insertBlankLine, so the save binding has to outrank it:
     // an unchanged body here is what proves no blank line was inserted first.
     expect(replaceBody).toHaveBeenCalledWith('t.md', 'Xfirst line')
+  })
+})
+
+describe('vault link chips', () => {
+  const TASK_PATH = 'brain/backlog/20260627-150000-write-project-readme.md'
+  const LINKS: VaultPage[] = [
+    { name: 'Write project README', kind: 'TASK', path: TASK_PATH, obsidianUri: 'obsidian://open?file=readme' },
+    { name: 'Augusto', kind: 'PERSON', path: 'brain/entities/augusto.md', obsidianUri: 'obsidian://open?file=augusto' },
+    { name: 'GTD', kind: 'NOTE', path: 'brain/reference/gtd.md', obsidianUri: 'obsidian://open?file=gtd' },
+  ]
+
+  const linked = (onNavigate?: EditProps['onNavigate']) =>
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], links: LINKS }, AREAS, onNavigate)
+
+  /** Dispatched by hand rather than through userEvent so the event object is available to inspect. */
+  function plainClick(el: Element) {
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    fireEvent(el, event)
+    return event
+  }
+
+  it('points a TASK at its card route, keeping the vault bucket as the path segment', async () => {
+    linked()
+    expect(await screen.findByRole('link', { name: 'Write project README' })).toHaveAttribute(
+      'href',
+      '/backlog/20260627-150000-write-project-readme.md',
+    )
+  })
+
+  it('points a PERSON at the person facet', async () => {
+    linked()
+    expect(await screen.findByRole('link', { name: 'Augusto' })).toHaveAttribute('href', '/persona/Augusto')
+  })
+
+  it('points a NOTE straight at Obsidian — it has no route in this app', async () => {
+    linked()
+    expect(await screen.findByRole('link', { name: 'GTD' })).toHaveAttribute('href', 'obsidian://open?file=gtd')
+  })
+
+  it('intercepts a plain click on a TASK chip instead of letting the browser reload the page', async () => {
+    const onNavigate = vi.fn()
+    linked(onNavigate)
+
+    const event = plainClick(await screen.findByRole('link', { name: 'Write project README' }))
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(onNavigate).toHaveBeenCalledWith('/backlog/20260627-150000-write-project-readme.md', { modal: true })
+  })
+
+  it('leaves a NOTE chip alone so the native obsidian:// link opens', async () => {
+    const onNavigate = vi.fn()
+    linked(onNavigate)
+
+    const event = plainClick(await screen.findByRole('link', { name: 'GTD' }))
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it('leaves a ctrl+click alone so "open in new tab" still works', async () => {
+    const onNavigate = vi.fn()
+    linked(onNavigate)
+
+    const link = await screen.findByRole('link', { name: 'Write project README' })
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })
+    fireEvent(link, event)
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it('renders nothing when the item has no links', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+    await screen.findByPlaceholderText('Title')
+    expect(screen.queryByText('Links')).not.toBeInTheDocument()
   })
 })
 
