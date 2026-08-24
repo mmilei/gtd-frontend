@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
  * Cross-bucket view dimensions reachable by URL. Values match the app-side facet names;
  * `person` is not a `Facet` yet, so this stays a standalone union.
  */
-export type RouteFacet = 'tag' | 'project' | 'area' | 'person'
+export type RouteFacet = 'tag' | 'project' | 'area' | 'location' | 'person'
 
 export type Route =
   /** The plain bucket list. */
@@ -18,11 +18,26 @@ export type Route =
   | { kind: 'facet'; facet: RouteFacet; value: string }
 
 /** URL vocabulary — the vault is written in Spanish, so the public paths are too. */
-const FACET_SEGMENTS: Record<string, RouteFacet> = {
+const FACET_SEGMENT: Record<RouteFacet, string> = {
   tag: 'tag',
-  proyecto: 'project',
+  project: 'proyecto',
   area: 'area',
-  persona: 'person',
+  location: 'ubicacion',
+  person: 'persona',
+}
+
+const FACET_SEGMENTS = Object.fromEntries(
+  Object.entries(FACET_SEGMENT).map(([facet, segment]) => [segment, facet]),
+) as Record<string, RouteFacet>
+
+/** Path for a cross-bucket facet view — the only place facet URLs are spelled out. */
+export function facetPath(facet: RouteFacet, value: string): string {
+  return `/${FACET_SEGMENT[facet]}/${encodeURIComponent(value)}`
+}
+
+/** Path for a single card. The bucket segment is cosmetic — parseRoute resolves by filename. */
+export function itemPath(bucket: string, file: string): string {
+  return `/${encodeURIComponent(bucket)}/${encodeURIComponent(file)}`
 }
 
 /** Deploy prefix without its trailing slash: '' when served from the domain root. */
@@ -53,6 +68,8 @@ export interface RouteState {
   /** True when this entry was pushed from inside the app — render a modal over the list, not a page. */
   modal: boolean
   navigate: (to: string, options?: { modal?: boolean }) => void
+  /** Leaves the current entry — how a modal opened by `navigate` is closed. */
+  back: () => void
 }
 
 function readLocation(): { route: Route; modal: boolean } {
@@ -63,7 +80,9 @@ function readLocation(): { route: Route; modal: boolean } {
 }
 
 export function useRoute(): RouteState {
-  const [state, setState] = useState(readLocation)
+  // A reload restores history.state, so the first render deliberately ignores the stored modal
+  // flag: only in-app navigation (or traversing back to such an entry) renders a modal.
+  const [state, setState] = useState(() => ({ route: parseRoute(window.location.pathname), modal: false }))
 
   useEffect(() => {
     const onPopState = () => setState(readLocation())
@@ -77,5 +96,7 @@ export function useRoute(): RouteState {
     setState(readLocation())
   }, [])
 
-  return { ...state, navigate }
+  const back = useCallback(() => window.history.back(), [])
+
+  return { ...state, navigate, back }
 }

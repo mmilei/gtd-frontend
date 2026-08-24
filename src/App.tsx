@@ -22,6 +22,7 @@ import { orderByPriority, orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
 import type { Bucket, ChatHistoryEntry, Facet, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
+import { facetPath, itemPath, useRoute } from './state/useRoute'
 
 const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
 
@@ -58,18 +59,21 @@ function hydrateFeed(history: ChatHistoryEntry[]): FeedEntry[] {
 
 export default function App() {
   const { buckets, apiStatus, refresh, completeItem, removeItem } = useBuckets()
+  const { route, modal, navigate, back } = useRoute()
   const [bucket, setBucket] = useState<Bucket>('today')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [feed, setFeed] = useState<FeedEntry[]>([])
   const [capturing, setCapturing] = useState(false)
-  const [editingFile, setEditingFile] = useState<string | null>(null)
+  // The open card and the open facet view are the URL, not state: closing one is history.back(),
+  // which is also what restores whatever view it was opened from.
+  const editingFile = route.kind === 'item' ? route.file : null
+  const facetView =
+    route.kind === 'facet' && route.facet !== 'person'
+      ? { facet: route.facet satisfies Facet, value: route.value }
+      : null
   // Opens EditModal in "new task" mode (file=null) instead of loading an existing one.
   const [creatingNew, setCreatingNew] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [facetView, setFacetView] = useState<{ facet: Facet; value: string } | null>(null)
-  // Remembers the facet view an item was opened from, so closing EditModal can return to it
-  // instead of dropping the user back to the plain bucket list.
-  const returnToFacetRef = useRef<{ facet: Facet; value: string } | null>(null)
   const [triageOpen, setTriageOpen] = useState(false)
   const [unconfirmedOpen, setUnconfirmedOpen] = useState(false)
   // Set when EditModal was opened from the Unconfirmed queue, so closing the editor returns there.
@@ -128,6 +132,19 @@ export default function App() {
       return prev.size === 1 && prev.has(tag) ? new Set() : new Set([tag])
     })
   }
+
+  // In-app navigation always pushes modal: true — the same URL entered directly renders as a page.
+  const openItem = useCallback(
+    (file: string) => {
+      const owner = (Object.keys(buckets) as Bucket[]).find(b => buckets[b].some(i => i.file === file))
+      navigate(itemPath(owner ?? bucket, file), { modal: true })
+    },
+    [buckets, bucket, navigate],
+  )
+  const openFacet = useCallback(
+    (facet: Facet, value: string) => navigate(facetPath(facet, value), { modal: true }),
+    [navigate],
+  )
 
   const bucketItems = buckets[bucket] ?? []
   const visibleItems = useMemo(() => {
@@ -206,7 +223,7 @@ export default function App() {
         // Low classifier confidence (confirmed: false) opens the same editor a manual edit uses —
         // saving there (even with no changes) is itself the confirmation.
         const needsReview = ops.find(o => o.op === 'create' && o.confirmed === false && o.file)
-        if (needsReview?.file) setEditingFile(needsReview.file)
+        if (needsReview?.file) openItem(needsReview.file)
         void refresh()
       } catch (err) {
         setFeed(prev =>
@@ -218,7 +235,7 @@ export default function App() {
         setCapturing(false)
       }
     },
-    [refresh, showUndo, setEditingFile],
+    [refresh, showUndo, openItem],
   )
 
   const captureError = useCallback((message: string) => {
@@ -266,6 +283,17 @@ export default function App() {
   }, [withUndo, completeItem])
   const remove = useMemo(() => withUndo(removeItem, 'Dismissed'), [withUndo, removeItem])
 
+  // Entered by URL rather than from inside the app: the card/facet is the page, so the list is
+  // never mounted behind it.
+  // ponytail: placeholder — the real standalone page component replaces this div.
+  if (route.kind !== 'list' && !modal) {
+    return (
+      <div className="p-8 font-mono text-[13px] text-ink">
+        {route.kind === 'item' ? route.file : `${route.facet}: ${route.value}`}
+      </div>
+    )
+  }
+
   return (
     <>
     <AmbientScene />
@@ -291,27 +319,27 @@ export default function App() {
           active={bucket}
           onSelect={selectBucket}
           projects={projectSuggestions}
-          onOpenProject={value => setFacetView({ facet: 'project', value })}
+          onOpenProject={value => openFacet('project', value)}
         />
         <main className="flex min-w-0 flex-1 flex-col">
-          <AreaBar areas={areaOptions} onOpenArea={value => setFacetView({ facet: 'area', value })} />
+          <AreaBar areas={areaOptions} onOpenArea={value => openFacet('area', value)} />
           <ItemList
             bucket={bucket}
             items={visibleItems}
             allItems={bucketItems}
             selectedTags={selectedTags}
             onToggleTag={toggleTag}
-            onViewTagAcross={value => setFacetView({ facet: 'tag', value })}
-            onOpenItem={setEditingFile}
-            onOpenProject={value => setFacetView({ facet: 'project', value })}
-            onOpenLocation={value => setFacetView({ facet: 'location', value })}
+            onViewTagAcross={value => openFacet('tag', value)}
+            onOpenItem={openItem}
+            onOpenProject={value => openFacet('project', value)}
+            onOpenLocation={value => openFacet('location', value)}
             onComplete={complete}
             onDismiss={remove}
             onFocus={bucket === 'today' ? startFocus : undefined}
           />
           <OpsFeed
             entries={feed}
-            onOpenItem={setEditingFile}
+            onOpenItem={openItem}
             onConfirmOp={confirmOp}
             onCancelOp={(id, i) => resolveOp(id, i, 'Cancelled — no changes')}
           />
@@ -327,12 +355,8 @@ export default function App() {
           locationSuggestions={locationSuggestions}
           areaOptions={areaOptions}
           onClose={() => {
-            setEditingFile(null)
-            setCreatingNew(false)
-            if (returnToFacetRef.current) {
-              setFacetView(returnToFacetRef.current)
-              returnToFacetRef.current = null
-            }
+            if (creatingNew) setCreatingNew(false)
+            else back()
             if (returnToUnconfirmedRef.current) {
               setUnconfirmedOpen(true)
               returnToUnconfirmedRef.current = false
@@ -342,23 +366,19 @@ export default function App() {
         />
       )}
       {searchOpen && (
-        <SearchOverlay buckets={buckets} onOpenItem={setEditingFile} onClose={() => setSearchOpen(false)} />
+        <SearchOverlay buckets={buckets} onOpenItem={openItem} onClose={() => setSearchOpen(false)} />
       )}
       {facetView && (
         <FacetView
           facet={facetView.facet}
           value={facetView.value}
           buckets={buckets}
-          onOpenItem={file => {
-            returnToFacetRef.current = facetView
-            setFacetView(null)
-            setEditingFile(file)
-          }}
-          onOpenProject={value => setFacetView({ facet: 'project', value })}
-          onOpenLocation={value => setFacetView({ facet: 'location', value })}
+          onOpenItem={openItem}
+          onOpenProject={value => openFacet('project', value)}
+          onOpenLocation={value => openFacet('location', value)}
           onComplete={complete}
           onDismiss={remove}
-          onClose={() => setFacetView(null)}
+          onClose={back}
         />
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
@@ -369,7 +389,7 @@ export default function App() {
           onEdit={file => {
             returnToUnconfirmedRef.current = true
             setUnconfirmedOpen(false)
-            setEditingFile(file)
+            openItem(file)
           }}
         />
       )}
