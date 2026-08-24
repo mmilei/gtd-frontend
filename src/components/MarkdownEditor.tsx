@@ -1,8 +1,53 @@
 import { markdown } from '@codemirror/lang-markdown'
-import { EditorState, Prec } from '@codemirror/state'
-import { EditorView, keymap, placeholder as placeholderExt } from '@codemirror/view'
+import { EditorState, Prec, RangeSetBuilder, StateField } from '@codemirror/state'
+import { Decoration, EditorView, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view'
 import { minimalSetup } from 'codemirror'
 import { useEffect, useRef } from 'react'
+
+/** `[[Target]]` on a single line — no nesting, no empty target. */
+const WIKILINK = /\[\[[^[\]\n]+\]\]/g
+
+const wikilinkMark = Decoration.mark({ class: 'cm-wikilink' })
+/** Empty replacement: the brackets stop being rendered, the text stays in `state.doc`. */
+const hiddenBrackets = Decoration.replace({})
+
+// ponytail: rescans the whole document on every transaction — note bodies are a few KB, so the
+// viewport-ranged scan CodeMirror recommends for large files would be complexity with no payoff.
+function wikilinkDecorations(state: EditorState): DecorationSet {
+  const cursorLine = state.doc.lineAt(state.selection.main.head).number
+  const builder = new RangeSetBuilder<Decoration>()
+  for (let n = 1; n <= state.doc.lines; n++) {
+    const line = state.doc.line(n)
+    WIKILINK.lastIndex = 0
+    for (let m = WIKILINK.exec(line.text); m; m = WIKILINK.exec(line.text)) {
+      const from = line.from + m.index
+      const to = from + m[0].length
+      if (n === cursorLine) {
+        // the line being edited stays verbatim, only tinted — hiding the brackets under the cursor
+        // is what makes an editor feel like it is fighting you
+        builder.add(from, to, wikilinkMark)
+      } else {
+        builder.add(from, from + 2, hiddenBrackets)
+        builder.add(from + 2, to - 2, wikilinkMark)
+        builder.add(to - 2, to, hiddenBrackets)
+      }
+    }
+  }
+  return builder.finish()
+}
+
+/**
+ * Obsidian-style wikilink rendering: `[[Target]]` shows as `Target` unless the cursor is on its line.
+ *
+ * Purely visual — decorations are a view-layer overlay and never touch `state.doc`, so the body that
+ * reaches `onChange` (and from there `setBody`/save) always carries the full `[[Target]]` source.
+ * A StateField rather than a ViewPlugin: no subscriptions, so nothing to tear down in a `destroy()`.
+ */
+const wikilinks = StateField.define<DecorationSet>({
+  create: wikilinkDecorations,
+  update: (_deco, tr) => wikilinkDecorations(tr.state),
+  provide: f => EditorView.decorations.from(f),
+})
 
 /**
  * Only tokens from src/styles/app.css — no CodeMirror palette leaks in.
@@ -44,6 +89,8 @@ const editorTheme = EditorView.theme(
       background: 'var(--color-accent-soft)',
     },
     '.cm-content span': { color: 'inherit' },
+    // (0,2,2) — outranks the `.cm-content span` reset above, per the note there
+    '.cm-content span.cm-wikilink': { color: 'var(--color-accent)' },
     '.cm-content .cm-placeholder': { color: 'var(--color-ink-faint)' },
   },
   { dark: true },
@@ -81,6 +128,7 @@ export function MarkdownEditor({ value, onChange, onSave, placeholder = '', clas
         extensions: [
           minimalSetup,
           markdown(),
+          wikilinks,
           EditorView.lineWrapping,
           // CodeMirror renders the placeholder as aria-placeholder, which is not an accessible-name
           // source — so the label has to be set too, or the textbox ends up nameless where the
