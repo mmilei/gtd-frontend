@@ -17,9 +17,11 @@ vi.mock('../lib/api', () => ({
   // MarkdownEditor loads the autocomplete sources when it mounts inside the modal.
   getPeople: vi.fn(async () => []),
   getPages: vi.fn(async () => []),
+  // The dependency picker's options, and what tells the modal a dependency is still open.
+  getBuckets: vi.fn(async () => ({ today: [], backlog: [], waiting: [], someday: [], reference: [] })),
 }))
 
-import { createItem, fetchItem, moveItem, patchMeta, replaceBody } from '../lib/api'
+import { createItem, fetchItem, getBuckets, markDone, moveItem, patchMeta, replaceBody } from '../lib/api'
 
 const AREAS = ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 
@@ -302,6 +304,89 @@ describe('vault link chips', () => {
     renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
     await screen.findByPlaceholderText('Title')
     expect(screen.queryByText('Links')).not.toBeInTheDocument()
+  })
+})
+
+describe('depends_on (warn, never forbid)', () => {
+  const BLOCKER: Item = { file: 'blocker.md', title: 'Order the tiles', bucket: 'backlog', tags: [] }
+  const OTHER_BLOCKER: Item = { file: 'other.md', title: 'Rent the cutter', bucket: 'today', tags: [] }
+  const CLOSED_DEP = 'already-done.md'
+
+  function withOpenTasks(...tasks: Item[]) {
+    vi.mocked(getBuckets).mockResolvedValue({
+      today: tasks.filter(t => t.bucket === 'today'),
+      backlog: tasks.filter(t => t.bucket === 'backlog'),
+      waiting: [],
+      someday: [],
+      reference: [],
+    })
+  }
+
+  it('lists the still-open dependencies by title before closing, and "Close anyway" closes', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(BLOCKER, OTHER_BLOCKER)
+    vi.mocked(markDone).mockResolvedValue({ file: 'blocked.md' })
+    renderModal({
+      file: 'blocked.md',
+      title: 'Lay the tiles',
+      bucket: 'backlog',
+      tags: [],
+      // CLOSED_DEP is finished, so it is not in the open lists and must not be warned about.
+      depends_on: [BLOCKER.file, CLOSED_DEP, OTHER_BLOCKER.file],
+    })
+
+    await screen.findByPlaceholderText('Title')
+    await user.click(screen.getByText('Done'))
+
+    const warning = await screen.findByText('This task still waits on these:')
+    const list = warning.parentElement as HTMLElement
+    expect(within(list).getByText('• Order the tiles')).toBeInTheDocument()
+    expect(within(list).getByText('• Rent the cutter')).toBeInTheDocument()
+    expect(within(list).queryByText(`• ${CLOSED_DEP}`)).not.toBeInTheDocument()
+    // nothing closed while the warning is up
+    expect(markDone).not.toHaveBeenCalled()
+
+    await user.click(screen.getByText('Close anyway'))
+
+    await waitFor(() => expect(markDone).toHaveBeenCalledWith('blocked.md'))
+  })
+
+  it('cancelling the warning leaves the task open', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(BLOCKER)
+    renderModal({ file: 'blocked.md', title: 'Lay the tiles', bucket: 'backlog', tags: [], depends_on: [BLOCKER.file] })
+
+    await screen.findByPlaceholderText('Title')
+    await user.click(screen.getByText('Done'))
+    await screen.findByText('This task still waits on:')
+    await user.click(screen.getByText('Cancel'))
+
+    expect(markDone).not.toHaveBeenCalled()
+    expect(screen.queryByText('This task still waits on:')).not.toBeInTheDocument()
+  })
+
+  it('closes straight away when every dependency is already finished', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(OTHER_BLOCKER)
+    vi.mocked(markDone).mockResolvedValue({ file: 'blocked.md' })
+    renderModal({ file: 'blocked.md', title: 'Lay the tiles', bucket: 'backlog', tags: [], depends_on: [CLOSED_DEP] })
+
+    await screen.findByPlaceholderText('Title')
+    await user.click(screen.getByText('Done'))
+
+    await waitFor(() => expect(markDone).toHaveBeenCalledWith('blocked.md'))
+  })
+
+  it('picks a dependency from the open tasks and saves it as filenames', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(BLOCKER)
+    renderModal({ file: 'blocked.md', title: 'Lay the tiles', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    await user.selectOptions(await screen.findByLabelText('Add dependency'), BLOCKER.file)
+    await user.click(screen.getByText('Save'))
+
+    await waitFor(() => expect(patchMeta).toHaveBeenCalledWith('blocked.md', expect.objectContaining({ depends_on: [BLOCKER.file] })))
   })
 })
 

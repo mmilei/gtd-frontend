@@ -1,6 +1,6 @@
-import { Check, FileText, Sparkles, SquareCheck, Trash2, User } from 'lucide-react'
+import { Check, FileText, Sparkles, SquareCheck, Trash2, User, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { createItem, dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
+import { createItem, dismissItem, fetchItem, getBuckets, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
@@ -143,11 +143,30 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const [location, setLocation] = useState('')
   const [estimate, setEstimate] = useState('')
   const [priority, setPriority] = useState<Priority | ''>('')
+  const [dependsOn, setDependsOn] = useState<string[]>([])
+  /** Every unfinished task in the vault — the dependency picker's options, and what makes a dependency "still open". */
+  const [openTasks, setOpenTasks] = useState<Item[]>([])
 
   const [saving, setSaving] = useState(false)
   const [saveLabel, setSaveLabel] = useState(isNew ? 'Save as new' : 'Save')
   const [improving, setImproving] = useState(false)
   const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+  const [confirmingDone, setConfirmingDone] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    // Promise.resolve() first so a throwing/undefined call lands in catch instead of crashing the
+    // modal: an unavailable list costs the picker and the warning, never the ability to close.
+    void Promise.resolve()
+      .then(getBuckets)
+      .then(buckets => {
+        if (!cancelled) setOpenTasks(Object.values(buckets).flat().filter(t => t.file !== file))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [file])
 
   useEffect(() => {
     if (file === null) return // new-task mode: nothing to fetch, fields start blank
@@ -166,6 +185,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         setLocation(item.location ?? '')
         setEstimate(item.estimate_minutes != null ? String(item.estimate_minutes) : '')
         setPriority(item.priority ?? '')
+        setDependsOn(item.depends_on ?? [])
       })
       .catch(() => !cancelled && setLoadFailed(true))
     return () => {
@@ -174,6 +194,18 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   }, [file])
 
   const userTags = useMemo(() => tags.filter(t => !SYSTEM_TAGS.has(t)), [tags])
+
+  /**
+   * The dependencies still unfinished, in the order they were added. A dependency absent from the
+   * open list is either done, dismissed, or gone — none of which blocks anything, so it drops out.
+   */
+  const openBlockers = useMemo(
+    () => dependsOn.map(f => openTasks.find(t => t.file === f)).filter((t): t is Item => t !== undefined),
+    [dependsOn, openTasks],
+  )
+
+  /** A closed dependency isn't in the open list, so its filename stands in for the title. */
+  const depLabel = (f: string) => openTasks.find(t => t.file === f)?.title ?? f
 
   const dirty = useMemo(() => {
     if (isNew) return title.trim() !== '' || body.trim() !== ''
@@ -188,9 +220,10 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       (project.trim() || null) !== (original.project ?? null) ||
       (location.trim() || null) !== (original.location ?? null) ||
       normEstimate(estimate) !== (original.estimate_minutes ?? null) ||
-      (priority || null) !== (original.priority ?? null)
+      (priority || null) !== (original.priority ?? null) ||
+      !sameSet(dependsOn, original.depends_on ?? [])
     )
-  }, [isNew, original, file, title, body, bucket, tags, due, area, project, location, estimate, priority])
+  }, [isNew, original, file, title, body, bucket, tags, due, area, project, location, estimate, priority, dependsOn])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -211,6 +244,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       setLocation('')
       setEstimate('')
       setPriority('')
+      setDependsOn([])
       return
     }
     if (!original) {
@@ -227,6 +261,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     setLocation(original.location ?? '')
     setEstimate(original.estimate_minutes != null ? String(original.estimate_minutes) : '')
     setPriority(original.priority ?? '')
+    setDependsOn(original.depends_on ?? [])
   }
 
   async function save() {
@@ -257,6 +292,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       const estimateNum = normEstimate(estimate)
       if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
       if ((priority || null) !== (original.priority ?? null)) meta.priority = priority || null
+      if (!sameSet(dependsOn, original.depends_on ?? [])) meta.depends_on = dependsOn
       // A manual save is itself a confirmation — with or without other edits — so a task the
       // classifier filed with low confidence (confirmed: false) never needs a separate review step.
       if (original.confirmed === false) meta.confirmed = true
@@ -264,7 +300,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
 
       // related_people isn't reset here: it's derived from the body by the backend, so this
       // client-side merge can't know the recomputed value without a refetch.
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null })
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null, depends_on: dependsOn })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
@@ -291,6 +327,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       const estimateNum = normEstimate(estimate)
       if (estimateNum != null) item.estimate_minutes = estimateNum
       if (priority) item.priority = priority
+      if (dependsOn.length > 0) item.depends_on = dependsOn
       await createItem(item)
 
       setSaveLabel('Saved ✓')
@@ -503,9 +540,70 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           />
         </div>
 
+        <div className="flex flex-col gap-1.5">
+          <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Depends on</span>
+          <div className="flex flex-wrap items-center gap-1.5 rounded-card border border-line bg-bg px-2.5 py-1.5">
+            {dependsOn.map(f => (
+              <span key={f} className="flex items-center gap-1 rounded-full bg-raised px-2.5 py-0.5 text-[11.5px] text-ink">
+                {depLabel(f)}
+                <button onClick={() => setDependsOn(prev => prev.filter(x => x !== f))} aria-label={`Remove ${depLabel(f)}`} className="text-ink-faint hover:text-discard">
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+            {/* A native select: the choices are a known, finite list of tasks, so there is nothing
+                for a typed filename to add except typos the backend would reject. */}
+            <select
+              aria-label="Add dependency"
+              value=""
+              onChange={e => {
+                const next = e.target.value
+                if (next) setDependsOn(prev => (prev.includes(next) ? prev : [...prev, next]))
+              }}
+              className="min-w-24 flex-1 bg-transparent py-0.5 text-[12px] text-ink-faint focus:outline-none"
+            >
+              <option value="">+ task this one waits on</option>
+              {openTasks
+                .filter(t => !dependsOn.includes(t.file))
+                .map(t => (
+                  <option key={t.file} value={t.file}>
+                    {t.title ?? t.file}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+
         <RelatedPeople people={original?.related_people ?? []} onNavigate={onNavigate} />
 
-        {confirmingDiscard ? (
+        {confirmingDone && !isNew ? (
+          // Warn, never forbid: "Close anyway" is always there and always closes.
+          <div className="flex flex-col gap-2 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
+            <span className="text-[12.5px] text-ink">
+              {openBlockers.length === 1 ? 'This task still waits on:' : 'This task still waits on these:'}
+            </span>
+            <ul className="flex flex-col gap-0.5 text-[12px] text-ink-muted">
+              {openBlockers.map(t => (
+                <li key={t.file}>• {t.title ?? t.file}</li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-3">
+              <div className="flex-1" />
+              <button onClick={() => setConfirmingDone(false)} className="rounded-md border border-line px-3 py-1 text-[12px] text-ink-muted">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmingDone(false)
+                  void runAndClose(() => markDone(file))
+                }}
+                className="rounded-md bg-done/20 px-3 py-1 text-[12px] text-done"
+              >
+                Close anyway
+              </button>
+            </div>
+          </div>
+        ) : confirmingDiscard ? (
           <div className="flex items-center gap-3 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
             <span className="flex-1 text-[12.5px] text-ink">Discard unsaved changes?</span>
             <button onClick={resetFromOriginal} className="rounded-md bg-discard/20 px-3 py-1 text-[12px] text-discard">Discard</button>
@@ -516,7 +614,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
             {!isNew && (
               <>
                 <button
-                  onClick={() => runAndClose(() => markDone(file))}
+                  onClick={() => (openBlockers.length > 0 ? setConfirmingDone(true) : runAndClose(() => markDone(file)))}
                   className="flex items-center gap-1.5 rounded-md border border-done/40 px-3 py-1.5 text-[12px] text-done transition-colors hover:bg-done/10"
                 >
                   <Check size={13} /> Done

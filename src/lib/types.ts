@@ -27,6 +27,11 @@ export interface Item {
   confirmed?: boolean | null
   /** Importance, not urgency — bucket + due already cover urgency. Absent = unprioritized. */
   priority?: 'low' | 'medium' | 'high' | null
+  /**
+   * Filenames of other tasks this one waits on. Advisory: the backend rejects a filename it
+   * doesn't have, but an unfinished dependency never blocks closing — the app warns instead.
+   */
+  depends_on?: string[]
   /** Vault pages this item's body links to, resolved by the backend. */
   links?: VaultPage[]
 }
