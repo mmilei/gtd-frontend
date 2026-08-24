@@ -1,7 +1,7 @@
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState, Prec, RangeSetBuilder, StateField } from '@codemirror/state'
-import { Decoration, EditorView, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view'
+import { Decoration, EditorView, WidgetType, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view'
 import { minimalSetup } from 'codemirror'
 import { useEffect, useRef } from 'react'
 import { getPages, getPeople } from '../lib/api'
@@ -50,6 +50,86 @@ const wikilinks = StateField.define<DecorationSet>({
   create: wikilinkDecorations,
   update: (_deco, tr) => wikilinkDecorations(tr.state),
   provide: f => EditorView.decorations.from(f),
+})
+
+/** A task marker at the head of a line: `- [ ]` / `* [x]`, indented or not. */
+const TASK_MARKER = /^\s*[-*+] \[[ xX]\](?= |$)/
+/** `- [x]` — fixed width, so the state character always sits at `MARKER + STATE_CHAR`. */
+const MARKER_LENGTH = 5
+const STATE_CHAR = 3
+
+/**
+ * Flips the state character of the task marker whose widget starts at `pos`.
+ *
+ * Unlike the wikilink decorations, this one writes: the checkbox is only a view of the markdown, so
+ * the toggle has to land in `state.doc` for the vault to ever see it. Reading the current character
+ * back out of the state rather than trusting the widget's own `checked` keeps the two in step even
+ * if the document moved between render and click.
+ */
+function toggleTask(view: EditorView, pos: number): boolean {
+  const at = pos + STATE_CHAR
+  const done = view.state.sliceDoc(at, at + 1) !== ' '
+  view.dispatch({ changes: { from: at, to: at + 1, insert: done ? ' ' : 'x' }, userEvent: 'input' })
+  return true
+}
+
+/** A real `<input type="checkbox">` — native semantics beat a span pretending to be one. */
+class CheckboxWidget extends WidgetType {
+  constructor(private readonly checked: boolean) {
+    super()
+  }
+
+  eq(other: CheckboxWidget) {
+    return other.checked === this.checked
+  }
+
+  toDOM() {
+    const box = document.createElement('input')
+    box.type = 'checkbox'
+    box.checked = this.checked
+    box.className = 'cm-task-checkbox'
+    box.setAttribute('aria-label', this.checked ? 'Completed task' : 'Task to do')
+    return box
+  }
+
+  /** The mousedown handler below needs the event, so the widget must not swallow it. */
+  ignoreEvent() {
+    return false
+  }
+}
+
+function checklistDecorations(state: EditorState): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>()
+  for (let n = 1; n <= state.doc.lines; n++) {
+    const line = state.doc.line(n)
+    const m = TASK_MARKER.exec(line.text)
+    if (!m) continue
+    // The indentation stays as text so nested lists keep their shape; only `- [x]` becomes the box.
+    const from = line.from + m[0].length - MARKER_LENGTH
+    const checked = m[0][m[0].length - 2] !== ' '
+    builder.add(from, from + MARKER_LENGTH, Decoration.replace({ widget: new CheckboxWidget(checked) }))
+  }
+  return builder.finish()
+}
+
+/** Same StateField shape as the wikilinks above — see the note there on why not a ViewPlugin. */
+const checklists = StateField.define<DecorationSet>({
+  create: checklistDecorations,
+  update: (_deco, tr) => checklistDecorations(tr.state),
+  provide: f => EditorView.decorations.from(f),
+})
+
+/**
+ * Clicks are taken on mousedown rather than on the input's own `change`: inside a contenteditable a
+ * widget's native activation is not something to rely on, and `posAtDOM` gives the live position of
+ * the marker, so nothing has to be captured in the widget.
+ */
+const checklistClicks = EditorView.domEventHandlers({
+  mousedown: (event, view) => {
+    const target = event.target as HTMLElement | null
+    if (!target?.classList.contains('cm-task-checkbox')) return false
+    return toggleTask(view, view.posAtDOM(target))
+  },
 })
 
 /**
@@ -139,6 +219,16 @@ const editorTheme = EditorView.theme(
     // (0,2,2) — outranks the `.cm-content span` reset above, per the note there
     '.cm-content span.cm-wikilink': { color: 'var(--color-accent)' },
     '.cm-content .cm-placeholder': { color: 'var(--color-ink-faint)' },
+    // Native checkbox, recoloured to the same green the card's done control uses — `accent-color`
+    // is the whole styling budget a real <input> needs.
+    '.cm-content input.cm-task-checkbox': {
+      accentColor: 'var(--color-done)',
+      width: '12px',
+      height: '12px',
+      margin: '0 2px 0 0',
+      verticalAlign: '-1px',
+      cursor: 'pointer',
+    },
     // Suggestion dropdown — same card surface as the modal's own controls, not CodeMirror's
     // default light-grey list.
     '.cm-tooltip.cm-tooltip-autocomplete': {
@@ -221,6 +311,8 @@ export function MarkdownEditor({ value, onChange, onSave, tagSuggestions = [], p
           minimalSetup,
           markdown(),
           wikilinks,
+          checklists,
+          checklistClicks,
           autocompletion({
             icons: false,
             override: [ctx => suggest(ctx, vault.current, tagsRef.current)],

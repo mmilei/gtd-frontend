@@ -106,6 +106,43 @@ describe('wikilink decorations', () => {
   })
 })
 
+describe('task checkboxes', () => {
+  it('rewrites the marker in the document when the rendered checkbox is clicked', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial="- [ ] buy milk" />)
+
+    const box = screen.getByRole('checkbox')
+    expect(box).not.toBeChecked()
+    // the literal marker is gone from the rendered text — the widget stands in for it
+    expect(editor().textContent).not.toContain('[ ]')
+
+    await user.click(box)
+
+    // Unlike the wikilink decorations, this one writes: the toggle has to reach the saved body.
+    expect(doc()).toBe('- [x] buy milk')
+    expect(outward()).toBe('- [x] buy milk')
+    expect(screen.getByRole('checkbox')).toBeChecked()
+
+    await user.click(screen.getByRole('checkbox'))
+
+    expect(doc()).toBe('- [ ] buy milk')
+    expect(outward()).toBe('- [ ] buy milk')
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+  })
+
+  it('keeps indentation and toggles the clicked line only', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={'- [ ] first\n  - [x] second\nnot a task'} />)
+
+    const boxes = screen.getAllByRole('checkbox')
+    expect(boxes).toHaveLength(2)
+
+    await user.click(boxes[1])
+
+    expect(doc()).toBe('- [ ] first\n  - [ ] second\nnot a task')
+  })
+})
+
 /** The suggestion list CodeMirror renders — `li[role=option]` inside the autocomplete tooltip. */
 const optionNamed = (name: string | RegExp) => screen.findByRole('option', { name })
 
