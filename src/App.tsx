@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AreaBar } from './components/AreaBar'
 import { BucketRail } from './components/BucketRail'
 import { CaptureBar } from './components/CaptureBar'
@@ -23,7 +23,7 @@ import { orderByPriority, orderToday } from './lib/todayOrder'
 import { SYSTEM_TAGS } from './lib/types'
 import type { Bucket, ChatHistoryEntry, Facet, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
-import { facetPath, itemPath, useRoute } from './state/useRoute'
+import { UNCONFIRMED_PATH, facetPath, itemPath, useRoute } from './state/useRoute'
 
 const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
 
@@ -79,9 +79,6 @@ export default function App() {
   const [creatingNew, setCreatingNew] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [triageOpen, setTriageOpen] = useState(false)
-  const [unconfirmedOpen, setUnconfirmedOpen] = useState(false)
-  // Set when EditModal was opened from the Unconfirmed queue, so closing the editor returns there.
-  const returnToUnconfirmedRef = useRef(false)
   // The area vocabulary lives in backend config (gtd.areas) — fetched once, empty while loading.
   const [areaOptions, setAreaOptions] = useState<string[]>([])
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -308,7 +305,7 @@ export default function App() {
         onOpenTriage={() => setTriageOpen(true)}
         onOpenReview={() => setReviewOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
-        onOpenUnconfirmed={() => setUnconfirmedOpen(true)}
+        onOpenUnconfirmed={() => navigate(UNCONFIRMED_PATH, { modal: true })}
         onNewTask={() => setCreatingNew(true)}
         unconfirmedCount={unconfirmedCount}
       />
@@ -378,14 +375,7 @@ export default function App() {
           projectSuggestions={projectSuggestions}
           locationSuggestions={locationSuggestions}
           areaOptions={areaOptions}
-          onClose={() => {
-            if (creatingNew) setCreatingNew(false)
-            else back()
-            if (returnToUnconfirmedRef.current) {
-              setUnconfirmedOpen(true)
-              returnToUnconfirmedRef.current = false
-            }
-          }}
+          onClose={() => (creatingNew ? setCreatingNew(false) : back())}
           onSaved={() => void refresh()}
         />
       )}
@@ -406,15 +396,13 @@ export default function App() {
         />
       )}
       {triageOpen && <TriageOverlay onClose={() => setTriageOpen(false)} onChanged={() => void refresh()} />}
-      {unconfirmedOpen && (
+      {route.kind === 'unconfirmed' && (
+        // The queue is a history entry, so opening a card from it just pushes on top: the queue
+        // unmounts, and closing the card (history.back) brings it back — remounted, hence refetched.
         <UnconfirmedQueue
-          onClose={() => setUnconfirmedOpen(false)}
+          onClose={modal ? back : exitPage}
           onChanged={() => void refresh()}
-          onEdit={file => {
-            returnToUnconfirmedRef.current = true
-            setUnconfirmedOpen(false)
-            openItem(file)
-          }}
+          onEdit={openItem}
         />
       )}
       {reviewOpen && <ReviewOverlay onClose={() => setReviewOpen(false)} onChanged={() => void refresh()} />}

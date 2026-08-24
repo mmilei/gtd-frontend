@@ -16,6 +16,11 @@ export type Route =
    */
   | { kind: 'item'; file: string }
   | { kind: 'facet'; facet: RouteFacet; value: string }
+  /** The review queue for low-confidence captures. */
+  | { kind: 'unconfirmed' }
+
+/** Path for the unconfirmed review queue — parameterless, so a constant rather than a builder. */
+export const UNCONFIRMED_PATH = '/unconfirmed'
 
 /** URL vocabulary — the vault is written in Spanish, so the public paths are too. */
 const FACET_SEGMENT: Record<RouteFacet, string> = {
@@ -54,6 +59,7 @@ export function parseRoute(pathname: string): Route {
   const prefix = basePrefix()
   const rel = prefix && pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname
   const segments = rel.split('/').filter(Boolean).map(decodeURIComponent)
+  if (segments.length === 1 && segments[0] === UNCONFIRMED_PATH.slice(1)) return { kind: 'unconfirmed' }
   if (segments.length === 2) {
     const [first, second] = segments
     if (second.endsWith('.md')) return { kind: 'item', file: second }

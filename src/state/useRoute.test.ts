@@ -36,6 +36,10 @@ describe('parseRoute', () => {
     expect(parseRoute('/persona/Alex')).toEqual({ kind: 'facet', facet: 'person', value: 'Alex' })
   })
 
+  it('parses the unconfirmed review queue', () => {
+    expect(parseRoute('/unconfirmed')).toEqual({ kind: 'unconfirmed' })
+  })
+
   it('decodes percent-encoded facet values', () => {
     expect(parseRoute('/tag/hardware%20store')).toEqual({ kind: 'facet', facet: 'tag', value: 'hardware store' })
   })

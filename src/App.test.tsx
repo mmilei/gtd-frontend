@@ -15,10 +15,11 @@ vi.mock('./lib/api', async () => {
     getAreas: vi.fn(),
     getChatHistory: vi.fn(),
     fetchItem: vi.fn(),
+    getUnconfirmed: vi.fn(),
   }
 })
 
-import { fetchItem, getAreas, getBuckets, getChatHistory, getToday } from './lib/api'
+import { fetchItem, getAreas, getBuckets, getChatHistory, getToday, getUnconfirmed } from './lib/api'
 
 const ITEM: Item = { file: '20260824-101500-buy-screws.md', title: 'Buy screws', bucket: 'today', tags: [] }
 const BUCKETS: BucketsMap = { today: [ITEM], backlog: [], waiting: [], someday: [], reference: [] }
@@ -27,12 +28,16 @@ const OPEN_CARD = { name: `Open "${ITEM.title}"` }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Spies on history.* are per-test; without this they leak into the next test and a real
+  // back-navigation silently becomes the previous test's no-op stub.
+  vi.restoreAllMocks()
   window.history.replaceState(null, '', '/')
   vi.mocked(getBuckets).mockResolvedValue(BUCKETS)
   vi.mocked(getToday).mockResolvedValue([ITEM])
   vi.mocked(getAreas).mockResolvedValue([])
   vi.mocked(getChatHistory).mockResolvedValue([])
   vi.mocked(fetchItem).mockResolvedValue(ITEM)
+  vi.mocked(getUnconfirmed).mockResolvedValue([])
 })
 
 describe('opening a card from inside the app', () => {
@@ -60,6 +65,43 @@ describe('opening a card from inside the app', () => {
     await user.click(screen.getByText('Cancel'))
 
     expect(back).toHaveBeenCalled()
+  })
+})
+
+describe('opening a card from the unconfirmed queue', () => {
+  const PENDING: Item = {
+    file: '20260824-090000-call-the-vet.md',
+    title: 'Call the vet',
+    bucket: 'backlog',
+    tags: [],
+    confirmed: false,
+  }
+  const QUEUE = { name: 'Unconfirmed' }
+
+  beforeEach(() => {
+    vi.mocked(getBuckets).mockResolvedValue({ ...BUCKETS, backlog: [PENDING] })
+    vi.mocked(getUnconfirmed).mockResolvedValue([PENDING])
+    vi.mocked(fetchItem).mockResolvedValue(PENDING)
+  })
+
+  it('comes back to the queue when the card is closed, not to the list', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /^Unconfirmed/ }))
+    expect(await screen.findByRole('dialog', QUEUE)).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: /^Edit/ }))
+    expect(await screen.findByPlaceholderText('Title')).toHaveValue(PENDING.title)
+    expect(screen.queryByRole('dialog', QUEUE)).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Cancel'))
+
+    // the queue is back — the editor is gone and the list did not take its place
+    expect(await screen.findByRole('dialog', QUEUE)).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Title')).not.toBeInTheDocument()
+    // and it refetched, so items handled in the editor drop out of the review
+    expect(vi.mocked(getUnconfirmed)).toHaveBeenCalledTimes(2)
   })
 })
 
