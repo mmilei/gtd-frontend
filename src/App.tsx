@@ -84,6 +84,9 @@ export default function App() {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [focusSession, setFocusSession] = useState<{ queue: Item[]; startIndex: number } | null>(null)
+  // Bumped on every popstate and on a bfcache restore (pageshow, event.persisted) — remounts the
+  // open item editor below via `key`, forcing a fresh fetch instead of showing whatever it last had.
+  const [navVersion, setNavVersion] = useState(0)
 
   const { toast, show: showUndo, dismiss: dismissToast, runUndo } = useUndoToast(refresh)
 
@@ -116,6 +119,27 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // URL back/forward never trusts what's already in memory: re-pull buckets and force the open
+  // item editor to refetch. A bfcache restore (pageshow with persisted:true) gets the same
+  // treatment — the whole page came back frozen from before, data and all.
+  useEffect(() => {
+    const onPopState = () => {
+      setNavVersion(v => v + 1)
+      void refresh()
+    }
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return
+      setNavVersion(v => v + 1)
+      void refresh()
+    }
+    window.addEventListener('popstate', onPopState)
+    window.addEventListener('pageshow', onPageShow)
+    return () => {
+      window.removeEventListener('popstate', onPopState)
+      window.removeEventListener('pageshow', onPageShow)
+    }
+  }, [refresh])
 
   function selectBucket(next: Bucket) {
     setBucket(next)
@@ -319,6 +343,7 @@ export default function App() {
         />
         {pageMode && editingFile ? (
           <CardPage
+            key={`${editingFile}-${navVersion}`}
             file={editingFile}
             tagSuggestions={tagSuggestions}
             projectSuggestions={projectSuggestions}
@@ -370,6 +395,7 @@ export default function App() {
 
       {((editingFile && modal) || creatingNew) && (
         <EditModal
+          key={creatingNew ? 'new' : `${editingFile}-${navVersion}`}
           file={creatingNew ? null : editingFile}
           tagSuggestions={tagSuggestions}
           projectSuggestions={projectSuggestions}

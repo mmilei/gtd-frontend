@@ -5,7 +5,7 @@ const BASE = '/api'
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${BASE}${path}`, init)
+    res = await fetch(`${BASE}${path}`, { ...init, cache: 'no-store' })
   } catch {
     throw new Error('Could not reach the server — is the Java server running on :8080?')
   }
