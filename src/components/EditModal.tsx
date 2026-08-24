@@ -58,6 +58,40 @@ function linkRoute(link: VaultPage): string | null {
 }
 
 /**
+ * related_people is derived by the backend from `[[Name]]` links in the body — display only, no
+ * add/remove controls. Always an in-app facet route, so no obsidian:// fallback is needed.
+ */
+function RelatedPeople({ people, onNavigate }: { people: string[]; onNavigate?: EditProps['onNavigate'] }) {
+  if (people.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Related people</span>
+      <div className="flex flex-wrap gap-1.5">
+        {people.map(name => {
+          const to = facetPath('person', name)
+          return (
+            <a
+              key={name}
+              href={withBase(to)}
+              onClick={e => {
+                if (!onNavigate) return
+                if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return
+                e.preventDefault()
+                onNavigate(to, { modal: true })
+              }}
+              className="flex items-center gap-1 rounded-full border border-line bg-raised px-2.5 py-0.5 text-[11.5px] text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+            >
+              <User size={11} className="shrink-0 text-ink-faint" />
+              {name}
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
  * The vault pages this item's body links to. Real anchors, so ctrl/middle-click and "open in new
  * tab" work for free — only a plain left click is intercepted, and only when the target is an
  * in-app route: obsidian:// links are left entirely to the browser.
@@ -103,7 +137,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const [body, setBody] = useState('')
   const [bucket, setBucket] = useState<Bucket | null>(isNew ? 'backlog' : null)
   const [tags, setTags] = useState<string[]>([])
-  const [people, setPeople] = useState<string[]>([])
   const [due, setDue] = useState('')
   const [area, setArea] = useState('')
   const [project, setProject] = useState('')
@@ -127,7 +160,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         setBody(normBody(item.body))
         setBucket(item.bucket ?? null)
         setTags(item.tags ?? [])
-        setPeople(item.related_people ?? [])
         setDue(normDate(item.due))
         setArea(item.area ?? '')
         setProject(item.project ?? '')
@@ -151,7 +183,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       body !== normBody(original.body) ||
       bucket !== (original.bucket ?? null) ||
       !sameSet(tags, original.tags ?? []) ||
-      !sameSet(people, original.related_people ?? []) ||
       (due || null) !== (normDate(original.due) || null) ||
       (area || null) !== (original.area ?? null) ||
       (project.trim() || null) !== (original.project ?? null) ||
@@ -159,7 +190,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       normEstimate(estimate) !== (original.estimate_minutes ?? null) ||
       (priority || null) !== (original.priority ?? null)
     )
-  }, [isNew, original, file, title, body, bucket, tags, people, due, area, project, location, estimate, priority])
+  }, [isNew, original, file, title, body, bucket, tags, due, area, project, location, estimate, priority])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -174,7 +205,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       setBody('')
       setBucket('backlog')
       setTags([])
-      setPeople([])
       setDue('')
       setArea('')
       setProject('')
@@ -191,7 +221,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     setBody(normBody(original.body))
     setBucket(original.bucket ?? null)
     setTags(original.tags ?? [])
-    setPeople(original.related_people ?? [])
     setDue(normDate(original.due))
     setArea(original.area ?? '')
     setProject(original.project ?? '')
@@ -220,7 +249,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         const d = new Date()
         meta.today_since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       }
-      if (!sameSet(people, original.related_people ?? [])) meta.related_people = people
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
       const nextProject = project.trim() || null
       if (nextProject !== (original.project ?? null)) meta.project = nextProject
@@ -234,7 +262,9 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, related_people: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null })
+      // related_people isn't reset here: it's derived from the body by the backend, so this
+      // client-side merge can't know the recomputed value without a refetch.
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
@@ -254,7 +284,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       const item: Partial<Item> & { bucket: Bucket; title: string } = { bucket, title: title.trim() }
       if (body.trim()) item.body = body
       if (tags.length > 0) item.tags = tags
-      if (people.length > 0) item.related_people = people
       if (due) item.due = due
       if (area) item.area = area
       if (project.trim()) item.project = project.trim()
@@ -474,15 +503,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Related people</span>
-          <PillEditor
-            values={people}
-            placeholder="+ person"
-            onAdd={p => setPeople(prev => (prev.includes(p) ? prev : [...prev, p]))}
-            onRemove={p => setPeople(prev => prev.filter(x => x !== p))}
-          />
-        </div>
+        <RelatedPeople people={original?.related_people ?? []} onNavigate={onNavigate} />
 
         {confirmingDiscard ? (
           <div className="flex items-center gap-3 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">

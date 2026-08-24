@@ -85,6 +85,43 @@ describe('today_since', () => {
   })
 })
 
+describe('related people (derived by the backend from body [[Name]] links)', () => {
+  it('displays the current names as read-only chips, with no add/remove control', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto', 'María José'] })
+
+    expect(await screen.findByText('Augusto')).toBeInTheDocument()
+    expect(screen.getByText('María José')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('+ person')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove Augusto' })).not.toBeInTheDocument()
+  })
+
+  it('links each name to the person facet', async () => {
+    const onNavigate = vi.fn()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto'] }, AREAS, onNavigate)
+
+    expect(await screen.findByRole('link', { name: 'Augusto' })).toHaveAttribute('href', '/persona/Augusto')
+  })
+
+  it('renders nothing when the item has no related people', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    expect(screen.queryByText('Related people')).not.toBeInTheDocument()
+  })
+
+  it('is never sent on save — editing other fields never round-trips related_people through patchMeta', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto'] })
+
+    const title = await screen.findByPlaceholderText('Title')
+    await user.type(title, ' edited')
+    await user.click(screen.getByText('Save'))
+
+    await waitFor(() => expect(patchMeta).toHaveBeenCalled())
+    expect(vi.mocked(patchMeta).mock.calls[0][1]).not.toHaveProperty('related_people')
+  })
+})
+
 describe('priority segmented control', () => {
   it('offers Low/Medium/High and persists the choice', async () => {
     const user = userEvent.setup()
