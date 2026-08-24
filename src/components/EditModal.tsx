@@ -5,6 +5,7 @@ import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
 import type { Bucket, Item, Priority } from '../lib/types'
+import { MarkdownEditor } from './MarkdownEditor'
 import { overlayFrame } from './Overlay'
 import type { Frame } from './Overlay'
 import { PillEditor } from './PillEditor'
@@ -278,16 +279,11 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           className="rounded-card border border-line bg-bg px-3.5 py-2 font-display text-[15px] text-ink focus:border-accent/60 focus:outline-none"
         />
 
-        <textarea
+        <MarkdownEditor
           value={body}
-          onChange={e => setBody(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) (isNew ? saveAsNew() : save())
-          }}
-          spellCheck={false}
-          rows={8}
+          onChange={setBody}
+          onSave={() => (isNew ? saveAsNew() : save())}
           placeholder="Notes (markdown)"
-          className="resize-y rounded-card border border-line bg-bg px-3.5 py-2.5 font-mono text-[12.5px] leading-relaxed text-ink focus:border-accent/60 focus:outline-none"
         />
 
         <div className="grid grid-cols-2 gap-4">

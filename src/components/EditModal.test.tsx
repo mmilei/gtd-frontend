@@ -15,7 +15,7 @@ vi.mock('../lib/api', () => ({
   createItem: vi.fn(),
 }))
 
-import { createItem, fetchItem, moveItem, patchMeta } from '../lib/api'
+import { createItem, fetchItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 
 const AREAS = ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 
@@ -141,6 +141,50 @@ describe('tag editing on an existing task (G8)', () => {
     await screen.findByText('Saved ✓')
 
     expect(patchMeta).toHaveBeenCalledWith('t.md', expect.objectContaining({ tags: ['home', 'urgent'] }))
+  })
+})
+
+describe('body editor (CodeMirror)', () => {
+  // CodeMirror's editable surface is a contenteditable exposing role="textbox"; the aria-label
+  // MarkdownEditor derives from the placeholder is what separates it from the plain <input>
+  // textboxes on the same form. jsdom reports no layout, so a click leaves the cursor at offset 0
+  // and a typed character lands at the front of the document.
+  const editor = () => screen.getByRole('textbox', { name: 'Notes (markdown)' })
+
+  // One character at a time on purpose: CodeMirror reads typing back out of the DOM through a
+  // MutationObserver, and under jsdom a burst of synthetic keystrokes outruns that flush and
+  // arrives scrambled. A single keypress per assertion is deterministic and proves the same path.
+  async function typeOne(user: ReturnType<typeof userEvent.setup>, char: string) {
+    await user.click(editor())
+    await user.keyboard(char)
+  }
+
+  it('shows the fetched body and persists a typed edit through replaceBody', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], body: 'first line' })
+
+    // the body arrives from the fetch after mount, so this also covers the outside-in value sync
+    await waitFor(() => expect(editor()).toHaveTextContent('first line'))
+    await typeOne(user, 'X')
+    expect(screen.getByText('Discard changes')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Save'))
+    await screen.findByText('Saved ✓')
+    expect(replaceBody).toHaveBeenCalledWith('t.md', 'Xfirst line')
+  })
+
+  it('still saves on Ctrl+Enter from inside the editor', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], body: 'first line' })
+
+    await waitFor(() => expect(editor()).toHaveTextContent('first line'))
+    await typeOne(user, 'X')
+    await user.keyboard('{Control>}{Enter}{/Control}')
+
+    await screen.findByText('Saved ✓')
+    // The default keymap binds Mod-Enter to insertBlankLine, so the save binding has to outrank it:
+    // an unchanged body here is what proves no blank line was inserted first.
+    expect(replaceBody).toHaveBeenCalledWith('t.md', 'Xfirst line')
   })
 })
 

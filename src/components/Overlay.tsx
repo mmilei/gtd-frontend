@@ -11,7 +11,10 @@ interface Props {
   wide?: boolean
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+// [contenteditable] keeps the CodeMirror body editor in the Tab cycle — it is focusable but is
+// neither a form control nor tabindex-bearing, so it would otherwise be skipped.
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea, input, select, [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
 
 /**
  * The surface a view renders into. Only the wrapper differs between a modal and a standalone
