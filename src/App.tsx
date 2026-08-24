@@ -71,10 +71,7 @@ export default function App() {
   // never mounted behind it — same chrome (header + rail), different main.
   const pageMode = route.kind !== 'list' && !modal
   const editingFile = route.kind === 'item' ? route.file : null
-  const facetView =
-    route.kind === 'facet' && route.facet !== 'person'
-      ? { facet: route.facet satisfies Facet, value: route.value }
-      : null
+  const facetView = route.kind === 'facet' ? { facet: route.facet, value: route.value } : null
   // Opens EditModal in "new task" mode (file=null) instead of loading an existing one.
   const [creatingNew, setCreatingNew] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)

@@ -26,6 +26,8 @@ export function itemMatches(item: Item, facet: Facet, value: string): boolean {
       return sameFacetValue(item.location, value)
     case 'area':
       return sameFacetValue(item.area, value)
+    case 'person':
+      return (item.related_people ?? []).some(p => sameFacetValue(p, value))
     default: {
       // Compile-time guard: adding a Facet member without a matching case above is a type error
       // here, instead of a silent runtime "matches nothing".

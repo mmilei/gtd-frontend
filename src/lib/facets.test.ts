@@ -18,6 +18,7 @@ describe('itemMatches', () => {
     project: 'gtd-frontend ',
     location: 'Ferretería',
     area: 'trabajo',
+    related_people: ['Augusto', 'María José'],
   }
 
   it('matches each facet accent/case-insensitively', () => {
@@ -25,6 +26,8 @@ describe('itemMatches', () => {
     expect(itemMatches(item, 'project', 'gtd-frontend')).toBe(true)
     expect(itemMatches(item, 'location', 'ferreteria')).toBe(true)
     expect(itemMatches(item, 'area', 'Trabajo')).toBe(true)
+    expect(itemMatches(item, 'person', 'augusto')).toBe(true)
+    expect(itemMatches(item, 'person', 'Maria Jose')).toBe(true)
   })
 
   it('does not match a different value', () => {
@@ -32,6 +35,7 @@ describe('itemMatches', () => {
     expect(itemMatches(item, 'project', 'java-gtd')).toBe(false)
     expect(itemMatches(item, 'location', 'farmacia')).toBe(false)
     expect(itemMatches(item, 'area', 'salud')).toBe(false)
+    expect(itemMatches(item, 'person', 'Tito')).toBe(false)
   })
 
   it('treats missing values as no match', () => {
@@ -40,5 +44,6 @@ describe('itemMatches', () => {
     expect(itemMatches(bare, 'project', 'gtd-frontend')).toBe(false)
     expect(itemMatches(bare, 'location', 'ferreteria')).toBe(false)
     expect(itemMatches(bare, 'area', 'trabajo')).toBe(false)
+    expect(itemMatches(bare, 'person', 'augusto')).toBe(false)
   })
 })

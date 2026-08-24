@@ -36,7 +36,7 @@ export type Priority = 'low' | 'medium' | 'high'
 export type BucketsMap = Record<Bucket, Item[]>
 
 /** Dimension a cross-bucket FacetView groups by. */
-export type Facet = 'tag' | 'project' | 'location' | 'area'
+export type Facet = 'tag' | 'project' | 'location' | 'area' | 'person'
 
 export interface Op {
   op: string

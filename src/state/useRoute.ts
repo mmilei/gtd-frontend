@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-
-/**
- * Cross-bucket view dimensions reachable by URL. Values match the app-side facet names;
- * `person` is not a `Facet` yet, so this stays a standalone union.
- */
-export type RouteFacet = 'tag' | 'project' | 'area' | 'location' | 'person'
+import type { Facet } from '../lib/types'
 
 export type Route =
   /** The plain bucket list. */
@@ -15,7 +10,7 @@ export type Route =
    * since moved to another bucket.
    */
   | { kind: 'item'; file: string }
-  | { kind: 'facet'; facet: RouteFacet; value: string }
+  | { kind: 'facet'; facet: Facet; value: string }
   /** The review queue for low-confidence captures. */
   | { kind: 'unconfirmed' }
 
@@ -23,7 +18,7 @@ export type Route =
 export const UNCONFIRMED_PATH = '/unconfirmed'
 
 /** URL vocabulary — the vault is written in Spanish, so the public paths are too. */
-const FACET_SEGMENT: Record<RouteFacet, string> = {
+const FACET_SEGMENT: Record<Facet, string> = {
   tag: 'tag',
   project: 'proyecto',
   area: 'area',
@@ -33,10 +28,10 @@ const FACET_SEGMENT: Record<RouteFacet, string> = {
 
 const FACET_SEGMENTS = Object.fromEntries(
   Object.entries(FACET_SEGMENT).map(([facet, segment]) => [segment, facet]),
-) as Record<string, RouteFacet>
+) as Record<string, Facet>
 
 /** Path for a cross-bucket facet view — the only place facet URLs are spelled out. */
-export function facetPath(facet: RouteFacet, value: string): string {
+export function facetPath(facet: Facet, value: string): string {
   return `/${FACET_SEGMENT[facet]}/${encodeURIComponent(value)}`
 }
 

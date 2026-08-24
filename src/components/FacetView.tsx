@@ -21,7 +21,7 @@ interface Props {
   frame?: Frame
 }
 
-const FACET_PREFIX: Record<Facet, string> = { tag: '#', project: '◆ ', location: '📍 ', area: '▣ ' }
+const FACET_PREFIX: Record<Facet, string> = { tag: '#', project: '◆ ', location: '📍 ', area: '▣ ', person: '@' }
 
 /** One reusable cross-bucket view: everything matching facet+value, grouped by bucket. */
 export function FacetView({ facet, value, buckets, onOpenItem, onOpenProject, onOpenLocation, onComplete, onDismiss, onClose, frame = overlayFrame }: Props) {
