@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AreaBar } from './components/AreaBar'
 import { BucketRail } from './components/BucketRail'
 import { CaptureBar } from './components/CaptureBar'
+import { CardPage, pageFrame } from './components/CardPage'
 import { EditModal } from './components/EditModal'
 import { Header } from './components/Header'
 import { HistoryPanel } from './components/HistoryPanel'
@@ -66,6 +67,9 @@ export default function App() {
   const [capturing, setCapturing] = useState(false)
   // The open card and the open facet view are the URL, not state: closing one is history.back(),
   // which is also what restores whatever view it was opened from.
+  // Entered by URL rather than from inside the app: the card/facet is the page, so the list is
+  // never mounted behind it — same chrome (header + rail), different main.
+  const pageMode = route.kind !== 'list' && !modal
   const editingFile = route.kind === 'item' ? route.file : null
   const facetView =
     route.kind === 'facet' && route.facet !== 'person'
@@ -119,6 +123,8 @@ export default function App() {
   function selectBucket(next: Bucket) {
     setBucket(next)
     setSelectedTags(new Set())
+    // The rail stays live on a standalone page — picking a bucket means "show me that list".
+    if (pageMode) navigate('/')
   }
 
   function toggleTag(tag: string, additive: boolean) {
@@ -283,16 +289,9 @@ export default function App() {
   }, [withUndo, completeItem])
   const remove = useMemo(() => withUndo(removeItem, 'Dismissed'), [withUndo, removeItem])
 
-  // Entered by URL rather than from inside the app: the card/facet is the page, so the list is
-  // never mounted behind it.
-  // ponytail: placeholder — the real standalone page component replaces this div.
-  if (route.kind !== 'list' && !modal) {
-    return (
-      <div className="p-8 font-mono text-[13px] text-ink">
-        {route.kind === 'item' ? route.file : `${route.facet}: ${route.value}`}
-      </div>
-    )
-  }
+  // A page was entered by URL, so there is no history entry to go back to — leaving it means
+  // navigating to the list.
+  const exitPage = () => navigate('/')
 
   return (
     <>
@@ -321,6 +320,30 @@ export default function App() {
           projects={projectSuggestions}
           onOpenProject={value => openFacet('project', value)}
         />
+        {pageMode && editingFile ? (
+          <CardPage
+            file={editingFile}
+            tagSuggestions={tagSuggestions}
+            projectSuggestions={projectSuggestions}
+            locationSuggestions={locationSuggestions}
+            areaOptions={areaOptions}
+            onClose={exitPage}
+            onSaved={() => void refresh()}
+          />
+        ) : pageMode && facetView ? (
+          <FacetView
+            facet={facetView.facet}
+            value={facetView.value}
+            buckets={buckets}
+            onOpenItem={openItem}
+            onOpenProject={value => openFacet('project', value)}
+            onOpenLocation={value => openFacet('location', value)}
+            onComplete={complete}
+            onDismiss={remove}
+            onClose={exitPage}
+            frame={pageFrame}
+          />
+        ) : (
         <main className="flex min-w-0 flex-1 flex-col">
           <AreaBar areas={areaOptions} onOpenArea={value => openFacet('area', value)} />
           <ItemList
@@ -345,9 +368,10 @@ export default function App() {
           />
           <CaptureBar busy={capturing} onSend={sendCapture} onError={captureError} />
         </main>
+        )}
       </div>
 
-      {(editingFile || creatingNew) && (
+      {((editingFile && modal) || creatingNew) && (
         <EditModal
           file={creatingNew ? null : editingFile}
           tagSuggestions={tagSuggestions}
@@ -368,7 +392,7 @@ export default function App() {
       {searchOpen && (
         <SearchOverlay buckets={buckets} onOpenItem={openItem} onClose={() => setSearchOpen(false)} />
       )}
-      {facetView && (
+      {facetView && modal && (
         <FacetView
           facet={facetView.facet}
           value={facetView.value}

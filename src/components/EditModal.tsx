@@ -5,10 +5,11 @@ import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
 import type { Bucket, Item, Priority } from '../lib/types'
-import { Overlay } from './Overlay'
+import { overlayFrame } from './Overlay'
+import type { Frame } from './Overlay'
 import { PillEditor } from './PillEditor'
 
-interface Props {
+export interface EditProps {
   /** null opens the modal in "new task" mode: blank fields, no fetch, "Save as new" instead of "Save". */
   file: string | null
   tagSuggestions: string[]
@@ -18,6 +19,8 @@ interface Props {
   areaOptions: string[]
   onClose: () => void
   onSaved: () => void
+  /** Surface to render into — the modal dialog unless a standalone page frame is passed. */
+  frame?: Frame
 }
 
 const cleanTag = (t: string) =>
@@ -36,7 +39,7 @@ const sameSet = (a: string[], b: string[]) =>
 /** Same rounding `save` applies before persisting, so `dirty` doesn't flag e.g. "30.4" as changed when it would save as the already-current 30. */
 const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
 
-export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved }: Props) {
+export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved, frame = overlayFrame }: EditProps) {
   const isNew = file === null
 
   const [original, setOriginal] = useState<Item | null>(null)
@@ -242,8 +245,10 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     }
   }
 
-  return (
-    <Overlay title={isNew ? 'New task' : loadFailed ? file : 'Edit'} onClose={requestClose} wide>
+  return frame({
+    title: isNew ? 'New task' : loadFailed ? file : 'Edit',
+    onClose: requestClose,
+    children: (
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-wrap gap-1.5">
           {BUCKET_ORDER.map(b => {
@@ -475,6 +480,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           </div>
         )}
       </div>
-    </Overlay>
-  )
+    ),
+  })
 }

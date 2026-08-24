@@ -13,6 +13,19 @@ interface Props {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
 
+/**
+ * The surface a view renders into. Only the wrapper differs between a modal and a standalone
+ * page — the body is the same component in both, mounted with a different frame.
+ */
+export type Frame = (props: { title: string; onClose: () => void; children: ReactNode }) => ReactNode
+
+/** Default frame: the modal dialog. */
+export const overlayFrame: Frame = ({ title, onClose, children }) => (
+  <Overlay title={title} onClose={onClose} wide>
+    {children}
+  </Overlay>
+)
+
 /** The single surface pattern for modal flows (edit, triage, review). */
 export function Overlay({ title, onClose, children, headerExtra, wide = false }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null)
