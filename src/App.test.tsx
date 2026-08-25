@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -102,6 +102,32 @@ describe('opening a card from the unconfirmed queue', () => {
     expect(screen.queryByPlaceholderText('Title')).not.toBeInTheDocument()
     // and it refetched, so items handled in the editor drop out of the review
     expect(vi.mocked(getUnconfirmed)).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('opening a link from inside a directly-entered page (mamushka)', () => {
+  const CHILD_TITLE = 'Order hinges'
+  const CHILD: Item = { file: '20260824-110000-order-hinges.md', title: CHILD_TITLE, bucket: 'today', tags: [] }
+  const PARENT: Item = {
+    ...ITEM,
+    links: [{ name: CHILD_TITLE, kind: 'TASK', path: `today/${CHILD.file}`, obsidianUri: '' }],
+  }
+
+  it('stacks the modal on top of the page instead of dropping the page for the list', async () => {
+    window.history.replaceState(null, '', `/today/${PARENT.file}`)
+    vi.mocked(fetchItem).mockImplementation(async file => (file === CHILD.file ? CHILD : PARENT))
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await within(screen.getByRole('main')).findByPlaceholderText('Title')).toHaveValue(PARENT.title)
+
+    await user.click(await screen.findByRole('link', { name: new RegExp(CHILD_TITLE) }))
+
+    // the child opens as a modal on top…
+    expect(await within(await screen.findByRole('dialog')).findByPlaceholderText('Title')).toHaveValue(CHILD_TITLE)
+    // …and the parent page is still there underneath it — never swapped for the plain item list
+    expect(within(screen.getByRole('main')).getByPlaceholderText('Title')).toHaveValue(PARENT.title)
+    expect(screen.queryByRole('button', OPEN_CARD)).not.toBeInTheDocument()
   })
 })
 

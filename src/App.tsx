@@ -24,6 +24,7 @@ import { SYSTEM_TAGS } from './lib/types'
 import type { Bucket, ChatHistoryEntry, Facet, Item, Op } from './lib/types'
 import { useBuckets } from './state/useBuckets'
 import { UNCONFIRMED_PATH, facetPath, itemPath, useRoute } from './state/useRoute'
+import type { Route } from './state/useRoute'
 
 const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
 
@@ -67,11 +68,24 @@ export default function App() {
   const [capturing, setCapturing] = useState(false)
   // The open card and the open facet view are the URL, not state: closing one is history.back(),
   // which is also what restores whatever view it was opened from.
-  // Entered by URL rather than from inside the app: the card/facet is the page, so the list is
-  // never mounted behind it — same chrome (header + rail), different main.
-  const pageMode = route.kind !== 'list' && !modal
-  const editingFile = route.kind === 'item' ? route.file : null
-  const facetView = route.kind === 'facet' ? { facet: route.facet, value: route.value } : null
+  //
+  // "Page" (baseRoute) and "modal" (route while modal:true) are two different slots, not one.
+  // Every open — from the list, from a page, or from another modal — pushes {modal:true}, so route
+  // always names the topmost card. Without a separate sticky baseRoute, the page slot below would
+  // re-derive from that same live route and flicker to the list the instant a second modal opened
+  // on top of a page; baseRoute only moves when a non-modal entry lands (direct URL, or exitPage),
+  // so it keeps showing what was there while modals stack and unwind (mamushka) on top of it —
+  // history.back() pops exactly one level, whether that reveals another modal or the page/list.
+  const [baseRoute, setBaseRoute] = useState<Route>(() => (modal ? { kind: 'list' } : route))
+  useEffect(() => {
+    if (!modal) setBaseRoute(route)
+  }, [route, modal])
+
+  const pageMode = baseRoute.kind !== 'list'
+  const pageFile = baseRoute.kind === 'item' ? baseRoute.file : null
+  const pageFacetView = baseRoute.kind === 'facet' ? { facet: baseRoute.facet, value: baseRoute.value } : null
+  const modalFile = modal && route.kind === 'item' ? route.file : null
+  const modalFacetView = modal && route.kind === 'facet' ? { facet: route.facet, value: route.value } : null
   // Opens EditModal in "new task" mode (file=null) instead of loading an existing one.
   const [creatingNew, setCreatingNew] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -338,10 +352,10 @@ export default function App() {
           projects={projectSuggestions}
           onOpenProject={value => openFacet('project', value)}
         />
-        {pageMode && route.kind === 'unconfirmed' ? null : pageMode && editingFile ? (
+        {pageMode && baseRoute.kind === 'unconfirmed' ? null : pageMode && pageFile ? (
           <CardPage
-            key={`${editingFile}-${navVersion}`}
-            file={editingFile}
+            key={`${pageFile}-${navVersion}`}
+            file={pageFile}
             tagSuggestions={tagSuggestions}
             projectSuggestions={projectSuggestions}
             locationSuggestions={locationSuggestions}
@@ -350,10 +364,10 @@ export default function App() {
             onSaved={() => void refresh()}
             onNavigate={navigate}
           />
-        ) : pageMode && facetView ? (
+        ) : pageMode && pageFacetView ? (
           <FacetView
-            facet={facetView.facet}
-            value={facetView.value}
+            facet={pageFacetView.facet}
+            value={pageFacetView.value}
             buckets={buckets}
             onOpenItem={openItem}
             onOpenProject={value => openFacet('project', value)}
@@ -391,10 +405,10 @@ export default function App() {
         )}
       </div>
 
-      {((editingFile && modal) || creatingNew) && (
+      {(modalFile || creatingNew) && (
         <EditModal
-          key={creatingNew ? 'new' : `${editingFile}-${navVersion}`}
-          file={creatingNew ? null : editingFile}
+          key={creatingNew ? 'new' : `${modalFile}-${navVersion}`}
+          file={creatingNew ? null : modalFile}
           tagSuggestions={tagSuggestions}
           projectSuggestions={projectSuggestions}
           locationSuggestions={locationSuggestions}
@@ -407,10 +421,10 @@ export default function App() {
       {searchOpen && (
         <SearchOverlay buckets={buckets} onOpenItem={openItem} onClose={() => setSearchOpen(false)} />
       )}
-      {facetView && modal && (
+      {modalFacetView && (
         <FacetView
-          facet={facetView.facet}
-          value={facetView.value}
+          facet={modalFacetView.facet}
+          value={modalFacetView.value}
           buckets={buckets}
           onOpenItem={openItem}
           onOpenProject={value => openFacet('project', value)}
