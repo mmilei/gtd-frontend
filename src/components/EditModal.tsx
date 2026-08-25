@@ -58,49 +58,15 @@ function linkRoute(link: VaultPage): string | null {
 }
 
 /**
- * related_people is derived by the backend from `[[Name]]` links in the body — display only, no
- * add/remove controls. Always an in-app facet route, so no obsidian:// fallback is needed.
- */
-function RelatedPeople({ people, onNavigate }: { people: string[]; onNavigate?: EditProps['onNavigate'] }) {
-  if (people.length === 0) return null
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Related people</span>
-      <div className="flex flex-wrap gap-1.5">
-        {people.map(name => {
-          const to = facetPath('person', name)
-          return (
-            <a
-              key={name}
-              href={withBase(to)}
-              onClick={e => {
-                if (!onNavigate) return
-                if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return
-                e.preventDefault()
-                onNavigate(to, { modal: true })
-              }}
-              className="flex items-center gap-1 rounded-full border border-line bg-raised px-2.5 py-0.5 text-[11.5px] text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
-            >
-              <User size={11} className="shrink-0 text-ink-faint" />
-              {name}
-            </a>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-/**
  * The vault pages this item's body links to. Real anchors, so ctrl/middle-click and "open in new
  * tab" work for free — only a plain left click is intercepted, and only when the target is an
  * in-app route: obsidian:// links are left entirely to the browser.
  */
-function VaultLinks({ links, onNavigate }: { links: VaultPage[]; onNavigate?: EditProps['onNavigate'] }) {
+function VaultLinks({ label, links, onNavigate }: { label: string; links: VaultPage[]; onNavigate?: EditProps['onNavigate'] }) {
   if (links.length === 0) return null
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Links</span>
+      <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">{label}</span>
       <div className="flex flex-wrap gap-1.5">
         {links.map(link => {
           const to = linkRoute(link)
@@ -125,6 +91,16 @@ function VaultLinks({ links, onNavigate }: { links: VaultPage[]; onNavigate?: Ed
       </div>
     </div>
   )
+}
+
+/**
+ * related_people is derived by the backend from `[[Name]]` links in the body — display only, no
+ * add/remove controls. Same chip as VaultLinks, with PERSON and an in-app facet route fixed: every
+ * entry here is a person, always resolvable inside the app, so no obsidian:// fallback applies.
+ */
+function RelatedPeople({ people, onNavigate }: { people: string[]; onNavigate?: EditProps['onNavigate'] }) {
+  const links: VaultPage[] = people.map(name => ({ name, kind: 'PERSON', path: '', obsidianUri: '' }))
+  return <VaultLinks label="Related people" links={links} onNavigate={onNavigate} />
 }
 
 export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved, frame = overlayFrame, onNavigate }: EditProps) {
@@ -406,7 +382,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           placeholder="Notes (markdown)"
         />
 
-        <VaultLinks links={original?.links ?? []} onNavigate={onNavigate} />
+        <VaultLinks label="Links" links={original?.links ?? []} onNavigate={onNavigate} />
 
         <div className="grid grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
