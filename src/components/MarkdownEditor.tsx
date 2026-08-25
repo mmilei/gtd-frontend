@@ -3,7 +3,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorState, Prec, RangeSetBuilder, StateField } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view'
 import { minimalSetup } from 'codemirror'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPerson, getPages, getPeople } from '../lib/api'
 import type { VaultPage } from '../lib/types'
 
@@ -174,7 +174,7 @@ function matchesTyped(label: string, typed: string): boolean {
  * The request fires on selection alone — the option itself is built from the list already in
  * memory, so typing stays as free as it was before.
  */
-function createPersonOption(name: string, vault: VaultOptions): Completion {
+function createPersonOption(name: string, vault: VaultOptions, onError: (message: string) => void): Completion {
   return {
     // `label` is what CodeMirror filters and matches against, so it has to be the typed text
     // itself or the option would filter itself out; `displayLabel` is what the dropdown shows.
@@ -192,9 +192,9 @@ function createPersonOption(name: string, vault: VaultOptions): Completion {
           // if it is still exactly where the dropdown left it.
           if (view.state.sliceDoc(from - 1, to) === `@${name}`) insertWikilink(view, { label: name }, from, to)
         })
-        .catch(() => {
-          // Name taken, server down — the typed text is left alone and nothing is inserted.
-        })
+        // Name taken, server down — the typed "@Name" is left alone (nothing inserted), but the
+        // user still has to be told: silently doing nothing reads as "it worked".
+        .catch((err: unknown) => onError(err instanceof Error ? err.message : `Could not create "${name}"`))
     },
   }
 }
@@ -205,7 +205,7 @@ function createPersonOption(name: string, vault: VaultOptions): Completion {
  * network. Returning `validFor` lets CodeMirror keep refiltering the same option array in the
  * browser instead of even calling this source again on the following characters.
  */
-function suggest(ctx: CompletionContext, vault: VaultOptions, tags: string[]): CompletionResult | null {
+function suggest(ctx: CompletionContext, vault: VaultOptions, tags: string[], onCreatePersonError: (message: string) => void): CompletionResult | null {
   const page = ctx.matchBefore(/\[\[[^[\]\n]*/)
   if (page) return { from: page.from + 2, options: vault.pages, validFor: /^[^[\]\n]*$/ }
 
@@ -215,7 +215,7 @@ function suggest(ctx: CompletionContext, vault: VaultOptions, tags: string[]): C
     // rebuilt on every character. Still no request — this only re-reads the cached list.
     const typed = person.text.slice(1)
     const known = vault.people.some(o => matchesTyped(o.label, typed.toLowerCase()))
-    const options = typed && !known ? [...vault.people, createPersonOption(typed, vault)] : vault.people
+    const options = typed && !known ? [...vault.people, createPersonOption(typed, vault, onCreatePersonError)] : vault.people
     return { from: person.from + 1, options }
   }
 
@@ -326,6 +326,15 @@ export function MarkdownEditor({ value, onChange, onSave, tagSuggestions = [], p
   const tagsRef = useRef(tagSuggestions)
   tagsRef.current = tagSuggestions
 
+  // "create person" failed (offline, name taken by a race) — shown next to the editor and cleared
+  // on a timer, so a silent catch doesn't read as "it worked".
+  const [createPersonError, setCreatePersonError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!createPersonError) return
+    const id = setTimeout(() => setCreatePersonError(null), 4000)
+    return () => clearTimeout(id)
+  }, [createPersonError])
+
   // The only network call this component makes: one round of vault lists per mount, read through a
   // ref by the completion source. Typing after a trigger filters that cached array in the browser.
   useEffect(() => {
@@ -365,7 +374,9 @@ export function MarkdownEditor({ value, onChange, onSave, tagSuggestions = [], p
           checklistClicks,
           autocompletion({
             icons: false,
-            override: [ctx => suggest(ctx, vault.current, tagsRef.current)],
+            // setCreatePersonError is a useState setter — stable identity, safe to close over here
+            // even though this effect (and the extensions it builds) only ever runs once.
+            override: [ctx => suggest(ctx, vault.current, tagsRef.current, setCreatePersonError)],
           }),
           EditorView.lineWrapping,
           // CodeMirror renders the placeholder as aria-placeholder, which is not an accessible-name
@@ -413,5 +424,14 @@ export function MarkdownEditor({ value, onChange, onSave, tagSuggestions = [], p
     }
   }, [value])
 
-  return <div ref={host} className={className} />
+  return (
+    <div className={className}>
+      <div ref={host} />
+      {createPersonError && (
+        <p role="alert" className="mt-1 font-mono text-[11px] text-ink-muted">
+          {createPersonError}
+        </p>
+      )}
+    </div>
+  )
 }
