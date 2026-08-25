@@ -338,7 +338,7 @@ export default function App() {
           projects={projectSuggestions}
           onOpenProject={value => openFacet('project', value)}
         />
-        {pageMode && editingFile ? (
+        {pageMode && route.kind === 'unconfirmed' ? null : pageMode && editingFile ? (
           <CardPage
             key={`${editingFile}-${navVersion}`}
             file={editingFile}
