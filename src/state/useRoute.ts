@@ -50,10 +50,19 @@ export function withBase(to: string): string {
   return `${basePrefix()}/${to.replace(/^\/+/, '')}`
 }
 
+/** A stray '%' (bad paste, hand-typed URL) throws in decodeURIComponent — fall back to the raw segment rather than crash the router. */
+function safeDecode(segment: string): string {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
 export function parseRoute(pathname: string): Route {
   const prefix = basePrefix()
   const rel = prefix && pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname
-  const segments = rel.split('/').filter(Boolean).map(decodeURIComponent)
+  const segments = rel.split('/').filter(Boolean).map(safeDecode)
   if (segments.length === 1 && segments[0] === UNCONFIRMED_PATH.slice(1)) return { kind: 'unconfirmed' }
   if (segments.length === 2) {
     const [first, second] = segments

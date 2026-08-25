@@ -49,6 +49,11 @@ describe('parseRoute', () => {
     expect(parseRoute('/tag')).toEqual({ kind: 'list' })
   })
 
+  it('does not throw on a malformed percent-encoding — a stray "%" is kept as-is', () => {
+    expect(() => parseRoute('/tag/100%')).not.toThrow()
+    expect(parseRoute('/tag/100%')).toEqual({ kind: 'facet', facet: 'tag', value: '100%' })
+  })
+
   it('strips the deploy prefix from BASE_URL', () => {
     vi.stubEnv('BASE_URL', '/gtd-frontend/')
     expect(parseRoute('/gtd-frontend/')).toEqual({ kind: 'list' })
