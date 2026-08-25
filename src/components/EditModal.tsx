@@ -136,7 +136,12 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     void Promise.resolve()
       .then(getBuckets)
       .then(buckets => {
-        if (!cancelled) setOpenTasks(Object.values(buckets).flat().filter(t => t.file !== file))
+        // reference = sin acción: those notes never move to done/discard, so one picked as a
+        // dependency would stay "still open" forever. Not offered, and not counted as a blocker.
+        if (!cancelled) {
+          const openable = Object.entries(buckets).flatMap(([b, items]) => (b === 'reference' ? [] : items))
+          setOpenTasks(openable.filter(t => t.file !== file))
+        }
       })
       .catch(() => {})
     return () => {
@@ -274,12 +279,18 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      // related_people isn't reset here: it's derived from the body by the backend, so this
-      // client-side merge can't know the recomputed value without a refetch.
+      // related_people and links are derived from the body by the backend, so this client-side
+      // merge can't know their recomputed value — a background refetch fills in just those two
+      // once the server has them (own catch: can't turn a save that already succeeded into an
+      // error, and only patches those two fields so a slow/stale response can't revert any of
+      // the ones just set above).
       setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null, depends_on: dependsOn })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
+      void fetchItem(file)
+        .then(fresh => setOriginal(prev => (prev ? { ...prev, links: fresh.links, related_people: fresh.related_people } : prev)))
+        .catch(() => {})
     } catch {
       setSaveLabel('Error — retry')
     } finally {
