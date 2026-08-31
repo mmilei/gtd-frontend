@@ -298,8 +298,9 @@ se encontraron porque había alguien preguntando. No corre sin supervisión.
   7. Editar, guardar, atrás y adelante → siempre contenido nuevo (cache)
   8. Abrir una tarjeta desde la cola de unconfirmed y cerrarla → vuelve a la cola
 - **VERIFY:** ninguno automático — lo juzga el usuario
-- **STATUS:** en curso — usuario probando en vivo contra `localhost:5173`/`:8080`. Feedback recibido
-  hasta ahora, ambos cubiertos por hallazgos del `/code-review` (ver abajo):
+- **STATUS:** verified (2026-08-31) — usuario confirmó los 8 pasos completos contra
+  `localhost:5173`/`:8080`. Durante la pasada parcial anterior había encontrado y arreglado 2 bugs
+  reales (cubiertos por hallazgos del `/code-review`, ver abajo):
   1. Save no refrescaba los hipervínculos nuevos → mismo bug que el finding de `links` stale, arreglado.
   2. Modal de tarjeta hija abre sobre la lista, no sobre la tarjeta padre — **arreglado en vivo**, a
      pedido explícito del usuario ("efecto mamushka"): la página de fondo (`baseRoute`) ahora es
@@ -307,6 +308,8 @@ se encontraron porque había alguien preguntando. No corre sin supervisión.
      empujando `{modal:true}`, así que abrir un link desde dentro de un modal apila otro modal encima
      (no reemplaza al padre), y `back()` desapila un nivel por vez — el padre "vuelve" cuando el hijo
      se cierra. Test de regresión mutado para confirmar que no es un falso positivo (`0f4d3f2`).
+  Mapa completo de acciones/atajos de la app documentado aparte en `docs/actions-and-shortcuts.md`
+  (`eedd591`) — más amplio que estos 8 pasos, queda como referencia post-loop.
 
 ---
 
@@ -333,16 +336,14 @@ Todo verificado por el orquestador tras cada fix: 73/73 tests, typecheck limpio,
 
 ---
 
-## Cierre (2026-08-25, cerrado con prueba humana PENDIENTE — a pedido explícito del usuario)
+## Cierre (2026-08-31, prueba humana confirmada — abriendo PR)
 
-**No se abre PR todavía.** El ítem 15 (prueba humana, 8 pasos) no se corrió completo: el usuario probó
-parcial contra el server real y encontró 2 bugs reales (cubiertos abajo), pero no confirmó el checklist
-entero. Retomar desde ahí antes de tocar `gh pr create` — `verifier`/`/ponytail-review`/`/code-review`
-ya corrieron sobre el diff (ver tabla más abajo), pero eso no reemplaza la confirmación humana.
+**Ítem 15 confirmado completo** (8/8 pasos) el 2026-08-31, sobre `localhost:5173`/`:8080`. Los 2 bugs
+reales que había encontrado la pasada parcial (2026-08-25) ya estaban arreglados antes de esta
+confirmación. `verifier`/`/ponytail-review`/`/code-review` ya habían corrido sobre el diff (ver tabla
+más abajo) — la confirmación humana era lo único que faltaba para `gh pr create`.
 
-**Dev servers: quedan corriendo**, a propósito — no se apagan porque la prueba sigue abierta. Backend
-`:8080` en `workspace/test-java/Java` rama `feat/depends-on`, frontend `:5173` en
-`workspace/test-node/gtd-frontend` rama `feat/markdown-editor-and-routing`.
+**Dev servers:** se apagan en este cierre — la prueba ya terminó.
 
 ### Resultado
 
