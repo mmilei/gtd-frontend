@@ -1,14 +1,17 @@
-import { Check, Sparkles, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { createItem, dismissItem, fetchItem, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
+import { Check, FileText, Sparkles, SquareCheck, Trash2, User, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createItem, dismissItem, fetchItem, getBuckets, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
 import { SYSTEM_TAGS } from '../lib/types'
-import type { Bucket, Item, Priority } from '../lib/types'
-import { Overlay } from './Overlay'
+import type { Bucket, Item, Priority, VaultPage } from '../lib/types'
+import { facetPath, itemPath, withBase } from '../state/useRoute'
+import { MarkdownEditor } from './MarkdownEditor'
+import { overlayFrame } from './Overlay'
+import type { Frame } from './Overlay'
 import { PillEditor } from './PillEditor'
 
-interface Props {
+export interface EditProps {
   /** null opens the modal in "new task" mode: blank fields, no fetch, "Save as new" instead of "Save". */
   file: string | null
   tagSuggestions: string[]
@@ -18,6 +21,10 @@ interface Props {
   areaOptions: string[]
   onClose: () => void
   onSaved: () => void
+  /** Surface to render into — the modal dialog unless a standalone page frame is passed. */
+  frame?: Frame
+  /** App-level navigation for the vault-link chips. Omitted: the links fall back to a full page load. */
+  onNavigate?: (to: string, options?: { modal?: boolean }) => void
 }
 
 const cleanTag = (t: string) =>
@@ -36,7 +43,67 @@ const sameSet = (a: string[], b: string[]) =>
 /** Same rounding `save` applies before persisting, so `dirty` doesn't flag e.g. "30.4" as changed when it would save as the already-current 30. */
 const normEstimate = (v: string) => (v ? Math.max(1, Math.round(Number(v))) : null)
 
-export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved }: Props) {
+const LINK_ICON = { TASK: SquareCheck, PERSON: User, NOTE: FileText }
+
+/**
+ * In-app route for a linked vault page, or null when the target isn't one of this app's URLs
+ * (a plain vault note lives only in Obsidian). The bucket segment comes from the vault path —
+ * cosmetic anyway, since parseRoute resolves a card by filename.
+ */
+function linkRoute(link: VaultPage): string | null {
+  if (link.kind === 'PERSON') return facetPath('person', link.name)
+  if (link.kind !== 'TASK') return null
+  const segments = link.path.split('/').filter(Boolean)
+  return itemPath(segments[segments.length - 2] ?? 'backlog', segments[segments.length - 1] ?? link.name)
+}
+
+/**
+ * The vault pages this item's body links to. Real anchors, so ctrl/middle-click and "open in new
+ * tab" work for free — only a plain left click is intercepted, and only when the target is an
+ * in-app route: obsidian:// links are left entirely to the browser.
+ */
+function VaultLinks({ label, links, onNavigate }: { label: string; links: VaultPage[]; onNavigate?: EditProps['onNavigate'] }) {
+  if (links.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">{label}</span>
+      <div className="flex flex-wrap gap-1.5">
+        {links.map(link => {
+          const to = linkRoute(link)
+          const Icon = LINK_ICON[link.kind]
+          return (
+            <a
+              key={`${link.kind}:${link.path}:${link.name}`}
+              href={to === null ? link.obsidianUri : withBase(to)}
+              onClick={e => {
+                if (to === null || !onNavigate) return
+                if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return
+                e.preventDefault()
+                onNavigate(to, { modal: true })
+              }}
+              className="flex items-center gap-1 rounded-full border border-line bg-raised px-2.5 py-0.5 text-[11.5px] text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+            >
+              <Icon size={11} className="shrink-0 text-ink-faint" />
+              {link.name}
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * related_people is derived by the backend from `[[Name]]` links in the body — display only, no
+ * add/remove controls. Same chip as VaultLinks, with PERSON and an in-app facet route fixed: every
+ * entry here is a person, always resolvable inside the app, so no obsidian:// fallback applies.
+ */
+function RelatedPeople({ people, onNavigate }: { people: string[]; onNavigate?: EditProps['onNavigate'] }) {
+  const links: VaultPage[] = people.map(name => ({ name, kind: 'PERSON', path: '', obsidianUri: '' }))
+  return <VaultLinks label="Related people" links={links} onNavigate={onNavigate} />
+}
+
+export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved, frame = overlayFrame, onNavigate }: EditProps) {
   const isNew = file === null
 
   const [original, setOriginal] = useState<Item | null>(null)
@@ -46,18 +113,48 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const [body, setBody] = useState('')
   const [bucket, setBucket] = useState<Bucket | null>(isNew ? 'backlog' : null)
   const [tags, setTags] = useState<string[]>([])
-  const [people, setPeople] = useState<string[]>([])
   const [due, setDue] = useState('')
   const [area, setArea] = useState('')
   const [project, setProject] = useState('')
   const [location, setLocation] = useState('')
   const [estimate, setEstimate] = useState('')
   const [priority, setPriority] = useState<Priority | ''>('')
+  const [dependsOn, setDependsOn] = useState<string[]>([])
+  /** Every unfinished task in the vault — the dependency picker's options, and what makes a dependency "still open". */
+  const [openTasks, setOpenTasks] = useState<Item[]>([])
 
   const [saving, setSaving] = useState(false)
   const [saveLabel, setSaveLabel] = useState(isNew ? 'Save as new' : 'Save')
   const [improving, setImproving] = useState(false)
   const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+  const [confirmingDone, setConfirmingDone] = useState(false)
+
+  // Read by save()'s background refetch below, which runs outside any effect (so it has no
+  // cleanup slot of its own) but can still resolve after the user has already closed the modal.
+  const mountedRef = useRef(true)
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    // Promise.resolve() first so a throwing/undefined call lands in catch instead of crashing the
+    // modal: an unavailable list costs the picker and the warning, never the ability to close.
+    void Promise.resolve()
+      .then(getBuckets)
+      .then(buckets => {
+        // reference = sin acción: those notes never move to done/discard, so one picked as a
+        // dependency would stay "still open" forever. Not offered, and not counted as a blocker.
+        if (!cancelled) {
+          const openable = Object.entries(buckets).flatMap(([b, items]) => (b === 'reference' ? [] : items))
+          setOpenTasks(openable.filter(t => t.file !== file))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [file])
 
   useEffect(() => {
     if (file === null) return // new-task mode: nothing to fetch, fields start blank
@@ -70,13 +167,13 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         setBody(normBody(item.body))
         setBucket(item.bucket ?? null)
         setTags(item.tags ?? [])
-        setPeople(item.related_people ?? [])
         setDue(normDate(item.due))
         setArea(item.area ?? '')
         setProject(item.project ?? '')
         setLocation(item.location ?? '')
         setEstimate(item.estimate_minutes != null ? String(item.estimate_minutes) : '')
         setPriority(item.priority ?? '')
+        setDependsOn(item.depends_on ?? [])
       })
       .catch(() => !cancelled && setLoadFailed(true))
     return () => {
@@ -86,6 +183,18 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
 
   const userTags = useMemo(() => tags.filter(t => !SYSTEM_TAGS.has(t)), [tags])
 
+  /**
+   * The dependencies still unfinished, in the order they were added. A dependency absent from the
+   * open list is either done, dismissed, or gone — none of which blocks anything, so it drops out.
+   */
+  const openBlockers = useMemo(
+    () => dependsOn.map(f => openTasks.find(t => t.file === f)).filter((t): t is Item => t !== undefined),
+    [dependsOn, openTasks],
+  )
+
+  /** A closed dependency isn't in the open list, so its filename stands in for the title. */
+  const depLabel = (f: string) => openTasks.find(t => t.file === f)?.title ?? f
+
   const dirty = useMemo(() => {
     if (isNew) return title.trim() !== '' || body.trim() !== ''
     if (!original) return false
@@ -94,15 +203,15 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       body !== normBody(original.body) ||
       bucket !== (original.bucket ?? null) ||
       !sameSet(tags, original.tags ?? []) ||
-      !sameSet(people, original.related_people ?? []) ||
       (due || null) !== (normDate(original.due) || null) ||
       (area || null) !== (original.area ?? null) ||
       (project.trim() || null) !== (original.project ?? null) ||
       (location.trim() || null) !== (original.location ?? null) ||
       normEstimate(estimate) !== (original.estimate_minutes ?? null) ||
-      (priority || null) !== (original.priority ?? null)
+      (priority || null) !== (original.priority ?? null) ||
+      !sameSet(dependsOn, original.depends_on ?? [])
     )
-  }, [isNew, original, file, title, body, bucket, tags, people, due, area, project, location, estimate, priority])
+  }, [isNew, original, file, title, body, bucket, tags, due, area, project, location, estimate, priority, dependsOn])
 
   function requestClose() {
     if (dirty) setConfirmingDiscard(true)
@@ -117,13 +226,13 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       setBody('')
       setBucket('backlog')
       setTags([])
-      setPeople([])
       setDue('')
       setArea('')
       setProject('')
       setLocation('')
       setEstimate('')
       setPriority('')
+      setDependsOn([])
       return
     }
     if (!original) {
@@ -134,13 +243,13 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     setBody(normBody(original.body))
     setBucket(original.bucket ?? null)
     setTags(original.tags ?? [])
-    setPeople(original.related_people ?? [])
     setDue(normDate(original.due))
     setArea(original.area ?? '')
     setProject(original.project ?? '')
     setLocation(original.location ?? '')
     setEstimate(original.estimate_minutes != null ? String(original.estimate_minutes) : '')
     setPriority(original.priority ?? '')
+    setDependsOn(original.depends_on ?? [])
   }
 
   async function save() {
@@ -163,7 +272,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         const d = new Date()
         meta.today_since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       }
-      if (!sameSet(people, original.related_people ?? [])) meta.related_people = people
       if ((area || null) !== (original.area ?? null)) meta.area = area || null
       const nextProject = project.trim() || null
       if (nextProject !== (original.project ?? null)) meta.project = nextProject
@@ -172,15 +280,26 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       const estimateNum = normEstimate(estimate)
       if (estimateNum !== (original.estimate_minutes ?? null)) meta.estimate_minutes = estimateNum
       if ((priority || null) !== (original.priority ?? null)) meta.priority = priority || null
+      if (!sameSet(dependsOn, original.depends_on ?? [])) meta.depends_on = dependsOn
       // A manual save is itself a confirmation — with or without other edits — so a task the
       // classifier filed with low confidence (confirmed: false) never needs a separate review step.
       if (original.confirmed === false) meta.confirmed = true
       if (Object.keys(meta).length > 0) await patchMeta(file, meta)
 
-      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, related_people: people, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null })
+      // related_people and links are derived from the body by the backend, so this client-side
+      // merge can't know their recomputed value — a background refetch fills in just those two
+      // once the server has them (own catch: can't turn a save that already succeeded into an
+      // error, and only patches those two fields so a slow/stale response can't revert any of
+      // the ones just set above).
+      setOriginal({ ...original, title, body, bucket: bucket ?? undefined, tags, due: due || null, today_since: meta.today_since !== undefined ? meta.today_since : original.today_since, area: area || null, project: nextProject, location: nextLocation, estimate_minutes: estimateNum, priority: priority || null, depends_on: dependsOn })
       setSaveLabel('Saved ✓')
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
+      void fetchItem(file)
+        .then(fresh => {
+          if (mountedRef.current) setOriginal(prev => (prev ? { ...prev, links: fresh.links, related_people: fresh.related_people } : prev))
+        })
+        .catch(() => {})
     } catch {
       setSaveLabel('Error — retry')
     } finally {
@@ -197,7 +316,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       const item: Partial<Item> & { bucket: Bucket; title: string } = { bucket, title: title.trim() }
       if (body.trim()) item.body = body
       if (tags.length > 0) item.tags = tags
-      if (people.length > 0) item.related_people = people
       if (due) item.due = due
       if (area) item.area = area
       if (project.trim()) item.project = project.trim()
@@ -205,6 +323,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       const estimateNum = normEstimate(estimate)
       if (estimateNum != null) item.estimate_minutes = estimateNum
       if (priority) item.priority = priority
+      if (dependsOn.length > 0) item.depends_on = dependsOn
       await createItem(item)
 
       setSaveLabel('Saved ✓')
@@ -242,8 +361,10 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     }
   }
 
-  return (
-    <Overlay title={isNew ? 'New task' : loadFailed ? file : 'Edit'} onClose={requestClose} wide>
+  return frame({
+    title: isNew ? 'New task' : loadFailed ? file : 'Edit',
+    onClose: requestClose,
+    children: (
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-wrap gap-1.5">
           {BUCKET_ORDER.map(b => {
@@ -273,17 +394,15 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           className="rounded-card border border-line bg-bg px-3.5 py-2 font-display text-[15px] text-ink focus:border-accent/60 focus:outline-none"
         />
 
-        <textarea
+        <MarkdownEditor
           value={body}
-          onChange={e => setBody(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) (isNew ? saveAsNew() : save())
-          }}
-          spellCheck={false}
-          rows={8}
+          onChange={setBody}
+          onSave={() => (isNew ? saveAsNew() : save())}
+          tagSuggestions={tagSuggestions}
           placeholder="Notes (markdown)"
-          className="resize-y rounded-card border border-line bg-bg px-3.5 py-2.5 font-mono text-[12.5px] leading-relaxed text-ink focus:border-accent/60 focus:outline-none"
         />
+
+        <VaultLinks label="Links" links={original?.links ?? []} onNavigate={onNavigate} />
 
         <div className="grid grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
@@ -418,16 +537,69 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Related people</span>
-          <PillEditor
-            values={people}
-            placeholder="+ person"
-            onAdd={p => setPeople(prev => (prev.includes(p) ? prev : [...prev, p]))}
-            onRemove={p => setPeople(prev => prev.filter(x => x !== p))}
-          />
+          <span className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Depends on</span>
+          <div className="flex flex-wrap items-center gap-1.5 rounded-card border border-line bg-bg px-2.5 py-1.5">
+            {dependsOn.map(f => (
+              <span key={f} className="flex items-center gap-1 rounded-full bg-raised px-2.5 py-0.5 text-[11.5px] text-ink">
+                {depLabel(f)}
+                <button onClick={() => setDependsOn(prev => prev.filter(x => x !== f))} aria-label={`Remove ${depLabel(f)}`} className="text-ink-faint hover:text-discard">
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+            {/* A native select: the choices are a known, finite list of tasks, so there is nothing
+                for a typed filename to add except typos the backend would reject. */}
+            <select
+              aria-label="Add dependency"
+              value=""
+              onChange={e => {
+                const next = e.target.value
+                if (next) setDependsOn(prev => (prev.includes(next) ? prev : [...prev, next]))
+              }}
+              className="min-w-24 flex-1 bg-transparent py-0.5 text-[12px] text-ink-faint focus:outline-none"
+            >
+              <option value="">+ task this one waits on</option>
+              {openTasks
+                .filter(t => !dependsOn.includes(t.file))
+                .map(t => (
+                  <option key={t.file} value={t.file}>
+                    {t.title ?? t.file}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
 
-        {confirmingDiscard ? (
+        <RelatedPeople people={original?.related_people ?? []} onNavigate={onNavigate} />
+
+        {confirmingDone && !isNew ? (
+          // Warn, never forbid: "Close anyway" is always there and always closes.
+          <div className="flex flex-col gap-2 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
+            <span className="text-[12.5px] text-ink">
+              {openBlockers.length === 1 ? 'This task still waits on:' : 'This task still waits on these:'}
+            </span>
+            <ul className="flex flex-col gap-0.5 text-[12px] text-ink-muted">
+              {openBlockers.map(t => (
+                <li key={t.file}>• {t.title ?? t.file}</li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-3">
+              <div className="flex-1" />
+              <button onClick={() => setConfirmingDone(false)} className="rounded-md border border-line px-3 py-1 text-[12px] text-ink-muted">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmingDone(false)
+                  void runAndClose(() => markDone(file))
+                }}
+                className="rounded-md bg-done/20 px-3 py-1 text-[12px] text-done"
+              >
+                Close anyway
+              </button>
+            </div>
+          </div>
+        ) : confirmingDiscard ? (
           <div className="flex items-center gap-3 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
             <span className="flex-1 text-[12.5px] text-ink">Discard unsaved changes?</span>
             <button onClick={resetFromOriginal} className="rounded-md bg-discard/20 px-3 py-1 text-[12px] text-discard">Discard</button>
@@ -438,7 +610,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
             {!isNew && (
               <>
                 <button
-                  onClick={() => runAndClose(() => markDone(file))}
+                  onClick={() => (openBlockers.length > 0 ? setConfirmingDone(true) : runAndClose(() => markDone(file)))}
                   className="flex items-center gap-1.5 rounded-md border border-done/40 px-3 py-1.5 text-[12px] text-done transition-colors hover:bg-done/10"
                 >
                   <Check size={13} /> Done
@@ -475,6 +647,6 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
           </div>
         )}
       </div>
-    </Overlay>
-  )
+    ),
+  })
 }

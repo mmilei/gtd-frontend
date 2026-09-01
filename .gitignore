@@ -1,6 +1,9 @@
 node_modules/
 dist/
+coverage/
 .env
 .env.local
 tsconfig.tsbuildinfo
 CLAUDE.md
+LOOP-STATE.md
+LOOP-USAGE.md

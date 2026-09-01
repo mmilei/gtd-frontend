@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Item } from '../lib/types'
+import type { Item, VaultPage } from '../lib/types'
 import { EditModal } from './EditModal'
+import type { EditProps } from './EditModal'
 
 vi.mock('../lib/api', () => ({
   fetchItem: vi.fn(),
@@ -13,13 +14,18 @@ vi.mock('../lib/api', () => ({
   dismissItem: vi.fn(),
   markdownifyItem: vi.fn(),
   createItem: vi.fn(),
+  // MarkdownEditor loads the autocomplete sources when it mounts inside the modal.
+  getPeople: vi.fn(async () => []),
+  getPages: vi.fn(async () => []),
+  // The dependency picker's options, and what tells the modal a dependency is still open.
+  getBuckets: vi.fn(async () => ({ today: [], backlog: [], waiting: [], someday: [], reference: [] })),
 }))
 
-import { createItem, fetchItem, moveItem, patchMeta } from '../lib/api'
+import { createItem, fetchItem, getBuckets, markDone, moveItem, patchMeta, replaceBody } from '../lib/api'
 
 const AREAS = ['personal', 'friends', 'exercise', 'work', 'health', 'finance', 'home', 'learning']
 
-function renderModal(item: Item, areaOptions: string[] = AREAS) {
+function renderModal(item: Item, areaOptions: string[] = AREAS, onNavigate?: EditProps['onNavigate']) {
   vi.mocked(fetchItem).mockResolvedValue(item)
   vi.mocked(patchMeta).mockImplementation(async (_file, meta) => ({ ...item, ...meta }))
   return render(
@@ -31,6 +37,7 @@ function renderModal(item: Item, areaOptions: string[] = AREAS) {
       areaOptions={areaOptions}
       onClose={() => {}}
       onSaved={() => {}}
+      onNavigate={onNavigate}
     />,
   )
 }
@@ -77,6 +84,53 @@ describe('today_since', () => {
 
     await waitFor(() => expect(patchMeta).toHaveBeenCalled())
     expect(vi.mocked(patchMeta).mock.calls[0][1]).not.toHaveProperty('today_since')
+  })
+})
+
+describe('related people (derived by the backend from body [[Name]] links)', () => {
+  it('displays the current names as read-only chips, with no add/remove control', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto', 'María José'] })
+
+    expect(await screen.findByText('Augusto')).toBeInTheDocument()
+    expect(screen.getByText('María José')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('+ person')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove Augusto' })).not.toBeInTheDocument()
+  })
+
+  it('does not key two chips identically (regression: VaultLinks keyed by kind+path, blank for every person)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto', 'María José'] })
+
+    await screen.findByText('Augusto')
+    const duplicateKeyWarning = consoleError.mock.calls.some(call => String(call[0]).includes('same key'))
+    expect(duplicateKeyWarning).toBe(false)
+    consoleError.mockRestore()
+  })
+
+  it('links each name to the person facet', async () => {
+    const onNavigate = vi.fn()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto'] }, AREAS, onNavigate)
+
+    expect(await screen.findByRole('link', { name: 'Augusto' })).toHaveAttribute('href', '/persona/Augusto')
+  })
+
+  it('renders nothing when the item has no related people', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    expect(screen.queryByText('Related people')).not.toBeInTheDocument()
+  })
+
+  it('is never sent on save — editing other fields never round-trips related_people through patchMeta', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto'] })
+
+    const title = await screen.findByPlaceholderText('Title')
+    await user.type(title, ' edited')
+    await user.click(screen.getByText('Save'))
+
+    await waitFor(() => expect(patchMeta).toHaveBeenCalled())
+    expect(vi.mocked(patchMeta).mock.calls[0][1]).not.toHaveProperty('related_people')
   })
 })
 
@@ -141,6 +195,208 @@ describe('tag editing on an existing task (G8)', () => {
     await screen.findByText('Saved ✓')
 
     expect(patchMeta).toHaveBeenCalledWith('t.md', expect.objectContaining({ tags: ['home', 'urgent'] }))
+  })
+})
+
+describe('body editor (CodeMirror)', () => {
+  // CodeMirror's editable surface is a contenteditable exposing role="textbox"; the aria-label
+  // MarkdownEditor derives from the placeholder is what separates it from the plain <input>
+  // textboxes on the same form. jsdom reports no layout, so a click leaves the cursor at offset 0
+  // and a typed character lands at the front of the document.
+  const editor = () => screen.getByRole('textbox', { name: 'Notes (markdown)' })
+
+  // One character at a time on purpose: CodeMirror reads typing back out of the DOM through a
+  // MutationObserver, and under jsdom a burst of synthetic keystrokes outruns that flush and
+  // arrives scrambled. A single keypress per assertion is deterministic and proves the same path.
+  async function typeOne(user: ReturnType<typeof userEvent.setup>, char: string) {
+    await user.click(editor())
+    await user.keyboard(char)
+  }
+
+  it('shows the fetched body and persists a typed edit through replaceBody', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], body: 'first line' })
+
+    // the body arrives from the fetch after mount, so this also covers the outside-in value sync
+    await waitFor(() => expect(editor()).toHaveTextContent('first line'))
+    await typeOne(user, 'X')
+    expect(screen.getByText('Discard changes')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Save'))
+    await screen.findByText('Saved ✓')
+    expect(replaceBody).toHaveBeenCalledWith('t.md', 'Xfirst line')
+  })
+
+  it('still saves on Ctrl+Enter from inside the editor', async () => {
+    const user = userEvent.setup()
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], body: 'first line' })
+
+    await waitFor(() => expect(editor()).toHaveTextContent('first line'))
+    await typeOne(user, 'X')
+    await user.keyboard('{Control>}{Enter}{/Control}')
+
+    await screen.findByText('Saved ✓')
+    // The default keymap binds Mod-Enter to insertBlankLine, so the save binding has to outrank it:
+    // an unchanged body here is what proves no blank line was inserted first.
+    expect(replaceBody).toHaveBeenCalledWith('t.md', 'Xfirst line')
+  })
+})
+
+describe('vault link chips', () => {
+  const TASK_PATH = 'brain/backlog/20260627-150000-write-project-readme.md'
+  const LINKS: VaultPage[] = [
+    { name: 'Write project README', kind: 'TASK', path: TASK_PATH, obsidianUri: 'obsidian://open?file=readme' },
+    { name: 'Augusto', kind: 'PERSON', path: 'brain/entities/augusto.md', obsidianUri: 'obsidian://open?file=augusto' },
+    { name: 'GTD', kind: 'NOTE', path: 'brain/reference/gtd.md', obsidianUri: 'obsidian://open?file=gtd' },
+  ]
+
+  const linked = (onNavigate?: EditProps['onNavigate']) =>
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], links: LINKS }, AREAS, onNavigate)
+
+  /** Dispatched by hand rather than through userEvent so the event object is available to inspect. */
+  function plainClick(el: Element) {
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    fireEvent(el, event)
+    return event
+  }
+
+  it('points a TASK at its card route, keeping the vault bucket as the path segment', async () => {
+    linked()
+    expect(await screen.findByRole('link', { name: 'Write project README' })).toHaveAttribute(
+      'href',
+      '/backlog/20260627-150000-write-project-readme.md',
+    )
+  })
+
+  it('points a PERSON at the person facet', async () => {
+    linked()
+    expect(await screen.findByRole('link', { name: 'Augusto' })).toHaveAttribute('href', '/persona/Augusto')
+  })
+
+  it('points a NOTE straight at Obsidian — it has no route in this app', async () => {
+    linked()
+    expect(await screen.findByRole('link', { name: 'GTD' })).toHaveAttribute('href', 'obsidian://open?file=gtd')
+  })
+
+  it('intercepts a plain click on a TASK chip instead of letting the browser reload the page', async () => {
+    const onNavigate = vi.fn()
+    linked(onNavigate)
+
+    const event = plainClick(await screen.findByRole('link', { name: 'Write project README' }))
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(onNavigate).toHaveBeenCalledWith('/backlog/20260627-150000-write-project-readme.md', { modal: true })
+  })
+
+  it('leaves a NOTE chip alone so the native obsidian:// link opens', async () => {
+    const onNavigate = vi.fn()
+    linked(onNavigate)
+
+    const event = plainClick(await screen.findByRole('link', { name: 'GTD' }))
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it('leaves a ctrl+click alone so "open in new tab" still works', async () => {
+    const onNavigate = vi.fn()
+    linked(onNavigate)
+
+    const link = await screen.findByRole('link', { name: 'Write project README' })
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })
+    fireEvent(link, event)
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it('renders nothing when the item has no links', async () => {
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [] })
+    await screen.findByPlaceholderText('Title')
+    expect(screen.queryByText('Links')).not.toBeInTheDocument()
+  })
+})
+
+describe('depends_on (warn, never forbid)', () => {
+  const BLOCKER: Item = { file: 'blocker.md', title: 'Order the tiles', bucket: 'backlog', tags: [] }
+  const OTHER_BLOCKER: Item = { file: 'other.md', title: 'Rent the cutter', bucket: 'today', tags: [] }
+  const CLOSED_DEP = 'already-done.md'
+
+  function withOpenTasks(...tasks: Item[]) {
+    vi.mocked(getBuckets).mockResolvedValue({
+      today: tasks.filter(t => t.bucket === 'today'),
+      backlog: tasks.filter(t => t.bucket === 'backlog'),
+      waiting: [],
+      someday: [],
+      reference: [],
+    })
+  }
+
+  it('lists the still-open dependencies by title before closing, and "Close anyway" closes', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(BLOCKER, OTHER_BLOCKER)
+    vi.mocked(markDone).mockResolvedValue({ file: 'blocked.md' })
+    renderModal({
+      file: 'blocked.md',
+      title: 'Lay the tiles',
+      bucket: 'backlog',
+      tags: [],
+      // CLOSED_DEP is finished, so it is not in the open lists and must not be warned about.
+      depends_on: [BLOCKER.file, CLOSED_DEP, OTHER_BLOCKER.file],
+    })
+
+    await screen.findByPlaceholderText('Title')
+    await user.click(screen.getByText('Done'))
+
+    const warning = await screen.findByText('This task still waits on these:')
+    const list = warning.parentElement as HTMLElement
+    expect(within(list).getByText('• Order the tiles')).toBeInTheDocument()
+    expect(within(list).getByText('• Rent the cutter')).toBeInTheDocument()
+    expect(within(list).queryByText(`• ${CLOSED_DEP}`)).not.toBeInTheDocument()
+    // nothing closed while the warning is up
+    expect(markDone).not.toHaveBeenCalled()
+
+    await user.click(screen.getByText('Close anyway'))
+
+    await waitFor(() => expect(markDone).toHaveBeenCalledWith('blocked.md'))
+  })
+
+  it('cancelling the warning leaves the task open', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(BLOCKER)
+    renderModal({ file: 'blocked.md', title: 'Lay the tiles', bucket: 'backlog', tags: [], depends_on: [BLOCKER.file] })
+
+    await screen.findByPlaceholderText('Title')
+    await user.click(screen.getByText('Done'))
+    await screen.findByText('This task still waits on:')
+    await user.click(screen.getByText('Cancel'))
+
+    expect(markDone).not.toHaveBeenCalled()
+    expect(screen.queryByText('This task still waits on:')).not.toBeInTheDocument()
+  })
+
+  it('closes straight away when every dependency is already finished', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(OTHER_BLOCKER)
+    vi.mocked(markDone).mockResolvedValue({ file: 'blocked.md' })
+    renderModal({ file: 'blocked.md', title: 'Lay the tiles', bucket: 'backlog', tags: [], depends_on: [CLOSED_DEP] })
+
+    await screen.findByPlaceholderText('Title')
+    await user.click(screen.getByText('Done'))
+
+    await waitFor(() => expect(markDone).toHaveBeenCalledWith('blocked.md'))
+  })
+
+  it('picks a dependency from the open tasks and saves it as filenames', async () => {
+    const user = userEvent.setup()
+    withOpenTasks(BLOCKER)
+    renderModal({ file: 'blocked.md', title: 'Lay the tiles', bucket: 'backlog', tags: [] })
+
+    await screen.findByPlaceholderText('Title')
+    await user.selectOptions(await screen.findByLabelText('Add dependency'), BLOCKER.file)
+    await user.click(screen.getByText('Save'))
+
+    await waitFor(() => expect(patchMeta).toHaveBeenCalledWith('blocked.md', expect.objectContaining({ depends_on: [BLOCKER.file] })))
   })
 })
 

@@ -1,11 +1,11 @@
-import type { Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData } from './types'
+import type { Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData, VaultPage } from './types'
 
 const BASE = '/api'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${BASE}${path}`, init)
+    res = await fetch(`${BASE}${path}`, { ...init, cache: 'no-store' })
   } catch {
     throw new Error('Could not reach the server — is the Java server running on :8080?')
   }
@@ -146,4 +146,21 @@ export function getProviders(): Promise<ProvidersResponse> {
 
 export function selectProvider(action: LlmAction, provider: string): Promise<{ action: string; active: string }> {
   return request('/providers/select', json({ action, provider }))
+}
+
+export function getPeople(): Promise<VaultPage[]> {
+  return request('/people')
+}
+
+/**
+ * Creates a person page in brain/entities/ — what the editor's `@` autocomplete offers when what
+ * was typed matches nobody. A blank or already-taken name comes back as a 400 whose `error` the
+ * shared request() turns into the thrown message.
+ */
+export function createPerson(name: string): Promise<{ created: boolean; name: string }> {
+  return request('/people', json({ name }))
+}
+
+export function getPages(): Promise<VaultPage[]> {
+  return request('/pages')
 }

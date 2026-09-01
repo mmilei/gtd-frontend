@@ -1,5 +1,13 @@
 export type Bucket = 'today' | 'backlog' | 'waiting' | 'someday' | 'reference'
 
+/** A vault page (person, task, or note) surfaced as a link target — from GET /api/people, /api/pages, or Item.links. */
+export interface VaultPage {
+  name: string
+  kind: 'TASK' | 'PERSON' | 'NOTE'
+  path: string
+  obsidianUri: string
+}
+
 export interface Item {
   file: string
   title?: string
@@ -19,6 +27,13 @@ export interface Item {
   confirmed?: boolean | null
   /** Importance, not urgency — bucket + due already cover urgency. Absent = unprioritized. */
   priority?: 'low' | 'medium' | 'high' | null
+  /**
+   * Filenames of other tasks this one waits on. Advisory: the backend rejects a filename it
+   * doesn't have, but an unfinished dependency never blocks closing — the app warns instead.
+   */
+  depends_on?: string[]
+  /** Vault pages this item's body links to, resolved by the backend. */
+  links?: VaultPage[]
 }
 
 export type Priority = 'low' | 'medium' | 'high'
@@ -26,7 +41,7 @@ export type Priority = 'low' | 'medium' | 'high'
 export type BucketsMap = Record<Bucket, Item[]>
 
 /** Dimension a cross-bucket FacetView groups by. */
-export type Facet = 'tag' | 'project' | 'location' | 'area'
+export type Facet = 'tag' | 'project' | 'location' | 'area' | 'person'
 
 export interface Op {
   op: string

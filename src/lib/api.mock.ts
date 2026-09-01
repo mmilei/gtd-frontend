@@ -1,6 +1,6 @@
 // In-memory GTD state for demo/GitHub Pages deployment.
 // Substituted for ./api by the vite.config.ts alias when VITE_MOCK=true.
-import type { ActionProviders, Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData } from './types'
+import type { ActionProviders, Bucket, BucketsMap, ChatHistoryEntry, ChatResponse, EventEntry, Item, LlmAction, ProvidersResponse, ReviewData, VaultPage } from './types'
 import type * as RealApi from './api'
 
 function todayStr(): string {
@@ -258,6 +258,42 @@ export async function selectProvider(action: LlmAction, provider: string): Promi
   return { action, active: provider }
 }
 
+const MOCK_PEOPLE: VaultPage[] = [
+  { name: 'Augusto', kind: 'PERSON', path: 'brain/entities/augusto.md', obsidianUri: 'obsidian://open?vault=vault&file=brain%2Fentities%2Faugusto.md' },
+  { name: 'design team', kind: 'PERSON', path: 'brain/entities/design-team.md', obsidianUri: 'obsidian://open?vault=vault&file=brain%2Fentities%2Fdesign-team.md' },
+]
+
+const MOCK_PAGES: VaultPage[] = [
+  ...MOCK_PEOPLE,
+  { name: 'Write project README', kind: 'TASK', path: 'brain/backlog/20260627-150000-write-project-readme.md', obsidianUri: 'obsidian://open?vault=vault&file=brain%2Fbacklog%2F20260627-150000-write-project-readme.md' },
+  { name: 'GTD — Getting Things Done', kind: 'NOTE', path: 'brain/reference/20260615-080000-gtd-getting-things-done.md', obsidianUri: 'obsidian://open?vault=vault&file=brain%2Freference%2F20260615-080000-gtd-getting-things-done.md' },
+]
+
+export async function getPeople(): Promise<VaultPage[]> {
+  return MOCK_PEOPLE.map(p => ({ ...p }))
+}
+
+export async function getPages(): Promise<VaultPage[]> {
+  return MOCK_PAGES.map(p => ({ ...p }))
+}
+
+/** Same two rejections the backend enforces — a blank name, and one the vault already has. */
+export async function createPerson(name: string): Promise<{ created: boolean; name: string }> {
+  const person = name.trim()
+  if (!person) throw new Error('name is required')
+  const taken = MOCK_PEOPLE.find(p => p.name.toLowerCase() === person.toLowerCase())
+  if (taken) throw new Error(`Person already exists: ${taken.name}`)
+  const page: VaultPage = {
+    name: person,
+    kind: 'PERSON',
+    path: `brain/entities/${person}.md`,
+    obsidianUri: `obsidian://open?vault=vault&file=brain%2Fentities%2F${encodeURIComponent(person)}.md`,
+  }
+  MOCK_PEOPLE.push(page)
+  MOCK_PAGES.push(page)
+  return { created: true, name: person }
+}
+
 // Structural contract check: the Vite alias in vite.config.ts swaps this whole module in for
 // ./api at build time, and nothing else imports both, so nothing else lets TypeScript catch a
 // drift between them. If this module's exports stop matching api.ts's shape, this assignment
@@ -267,6 +303,6 @@ const _contract: typeof RealApi = {
   chat, createItem, getBuckets, getBucket, getToday, getUnconfirmed, getAreas, fetchItem, markDone, dismissItem,
   moveItem, patchMeta, replaceBody, markdownifyItem, getReview, undo,
   confirmChatOp, confirmItem, getChatHistory, getEvents, transcribe,
-  getProviders, selectProvider,
+  getProviders, selectProvider, getPeople, getPages, createPerson,
 }
 void _contract
