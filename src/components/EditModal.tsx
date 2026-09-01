@@ -1,5 +1,5 @@
 import { Check, FileText, Sparkles, SquareCheck, Trash2, User, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createItem, dismissItem, fetchItem, getBuckets, markDone, markdownifyItem, moveItem, patchMeta, replaceBody } from '../lib/api'
 import { BUCKET_META, BUCKET_ORDER } from '../lib/bucketMeta'
 import { PRIORITY_ORDER, PRIORITY_META } from '../lib/priorityMeta'
@@ -73,7 +73,7 @@ function VaultLinks({ label, links, onNavigate }: { label: string; links: VaultP
           const Icon = LINK_ICON[link.kind]
           return (
             <a
-              key={`${link.kind}:${link.path}`}
+              key={`${link.kind}:${link.path}:${link.name}`}
               href={to === null ? link.obsidianUri : withBase(to)}
               onClick={e => {
                 if (to === null || !onNavigate) return
@@ -128,6 +128,13 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
   const [improving, setImproving] = useState(false)
   const [confirmingDiscard, setConfirmingDiscard] = useState(false)
   const [confirmingDone, setConfirmingDone] = useState(false)
+
+  // Read by save()'s background refetch below, which runs outside any effect (so it has no
+  // cleanup slot of its own) but can still resolve after the user has already closed the modal.
+  const mountedRef = useRef(true)
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -289,7 +296,9 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
       setTimeout(() => setSaveLabel('Save'), 1000)
       onSaved()
       void fetchItem(file)
-        .then(fresh => setOriginal(prev => (prev ? { ...prev, links: fresh.links, related_people: fresh.related_people } : prev)))
+        .then(fresh => {
+          if (mountedRef.current) setOriginal(prev => (prev ? { ...prev, links: fresh.links, related_people: fresh.related_people } : prev))
+        })
         .catch(() => {})
     } catch {
       setSaveLabel('Error — retry')

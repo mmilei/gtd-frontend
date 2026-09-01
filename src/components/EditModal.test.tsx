@@ -97,6 +97,16 @@ describe('related people (derived by the backend from body [[Name]] links)', () 
     expect(screen.queryByRole('button', { name: 'Remove Augusto' })).not.toBeInTheDocument()
   })
 
+  it('does not key two chips identically (regression: VaultLinks keyed by kind+path, blank for every person)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto', 'María José'] })
+
+    await screen.findByText('Augusto')
+    const duplicateKeyWarning = consoleError.mock.calls.some(call => String(call[0]).includes('same key'))
+    expect(duplicateKeyWarning).toBe(false)
+    consoleError.mockRestore()
+  })
+
   it('links each name to the person facet', async () => {
     const onNavigate = vi.fn()
     renderModal({ file: 't.md', title: 'Task', bucket: 'backlog', tags: [], related_people: ['Augusto'] }, AREAS, onNavigate)

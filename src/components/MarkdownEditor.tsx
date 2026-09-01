@@ -186,8 +186,11 @@ function createPersonOption(name: string, vault: VaultOptions, onError: (message
       void createPerson(name)
         .then(() => {
           // The vault lists are fetched once per mount, so the new page has to be added by hand
-          // or the next `@` would offer to create the same person again.
-          vault.people = [...vault.people, { label: name, detail: 'person', apply: insertWikilink }]
+          // or the next `@` would offer to create the same person again — and the next `[[` would
+          // not find them at all, since that trigger reads vault.pages, not vault.people.
+          const option: Completion = { label: name, detail: 'person', apply: insertWikilink }
+          vault.people = [...vault.people, option]
+          vault.pages = [...vault.pages, option]
           // The document can have moved while the request was in flight; rewrite the trigger only
           // if it is still exactly where the dropdown left it.
           if (view.state.sliceDoc(from - 1, to) === `@${name}`) insertWikilink(view, { label: name }, from, to)

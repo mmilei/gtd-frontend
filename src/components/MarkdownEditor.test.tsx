@@ -222,6 +222,19 @@ describe('autocomplete', () => {
     expect(screen.queryByRole('option', { name: /create person/ })).toBeNull()
   })
 
+  it('makes the created person findable via [[ too, not just @ (regression: only vault.people was updated)', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial="" />)
+
+    await type(user, '@Zeb')
+    await optionNamed(/create person "Zeb"/)
+    await accept(user)
+    await waitFor(() => expect(doc()).toBe('[[Zeb]]'))
+
+    await keys(user, ' [[Zeb')
+    await optionNamed(/^Zeb/)
+  })
+
   it('does not fetch again while typing after a trigger', async () => {
     const user = userEvent.setup()
     render(<Harness initial="" />)
