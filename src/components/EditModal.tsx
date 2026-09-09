@@ -232,6 +232,14 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     return () => registerDirtyGuard(null)
   }, [dirty, registerDirtyGuard])
 
+  // The confirmation bar (Done-blocked / Discard changes) renders at the bottom of the scrollable
+  // form — if the user had scrolled up, it can pop in fully out of view with no visible feedback
+  // that anything happened at all (looked like Back/Escape/X just silently did nothing).
+  const footerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (confirmingDone || confirmingDiscard) footerRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [confirmingDone, confirmingDiscard])
+
   /** Throw away edits and restore the just-opened state — the modal stays open. */
   function resetFromOriginal() {
     setConfirmingDiscard(false)
@@ -586,6 +594,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
 
         <RelatedPeople people={original?.related_people ?? []} onNavigate={onNavigate} />
 
+        <div ref={footerRef}>
         {confirmingDone && !isNew ? (
           // Warn, never forbid: "Close anyway" is always there and always closes.
           <div className="flex flex-col gap-2 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
@@ -660,6 +669,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
             </button>
           </div>
         )}
+        </div>
       </div>
     ),
   })
