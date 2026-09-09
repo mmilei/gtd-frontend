@@ -61,7 +61,7 @@ function hydrateFeed(history: ChatHistoryEntry[]): FeedEntry[] {
 
 export default function App() {
   const { buckets, apiStatus, refresh, completeItem, removeItem } = useBuckets()
-  const { route, modal, navigate, back } = useRoute()
+  const { route, modal, navigate, back, setBackGuard, isBackGuarded } = useRoute()
   const [bucket, setBucket] = useState<Bucket>('today')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [feed, setFeed] = useState<FeedEntry[]>([])
@@ -136,6 +136,9 @@ export default function App() {
   // treatment — the whole page came back frozen from before, data and all.
   useEffect(() => {
     const onPopState = () => {
+      // A dirty EditModal's guard (registered via setBackGuard) just absorbed this popstate and
+      // pushed the entry back on top — the route didn't actually change, so don't refetch/remount.
+      if (isBackGuarded()) return
       setNavVersion(v => v + 1)
       void refresh()
     }
@@ -150,7 +153,7 @@ export default function App() {
       window.removeEventListener('popstate', onPopState)
       window.removeEventListener('pageshow', onPageShow)
     }
-  }, [refresh])
+  }, [refresh, isBackGuarded])
 
   function selectBucket(next: Bucket) {
     setBucket(next)
@@ -416,6 +419,7 @@ export default function App() {
           onClose={() => (creatingNew ? setCreatingNew(false) : back())}
           onSaved={() => void refresh()}
           onNavigate={navigate}
+          registerDirtyGuard={setBackGuard}
         />
       )}
       {searchOpen && (

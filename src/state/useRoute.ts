@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Facet } from '../lib/types'
 
 export type Route =
@@ -80,6 +80,15 @@ export interface RouteState {
   navigate: (to: string, options?: { modal?: boolean }) => void
   /** Leaves the current entry — how a modal opened by `navigate` is closed. */
   back: () => void
+  /**
+   * Registers a handler that intercepts the next browser back/forward instead of letting it apply —
+   * a dirty EditModal uses this to show its own discard-confirmation instead of being silently
+   * unmounted by the route change. Pass null to clear (modal becomes clean, or unmounts).
+   */
+  setBackGuard: (handler: (() => void) | null) => void
+  /** Read-only check for other popstate listeners (App's navVersion/refresh bump) to skip their own
+   *  work on a popstate that a guard just absorbed — see setBackGuard. */
+  isBackGuarded: () => boolean
 }
 
 function readLocation(): { route: Route; modal: boolean } {
@@ -93,9 +102,27 @@ export function useRoute(): RouteState {
   // A reload restores history.state, so the first render deliberately ignores the stored modal
   // flag: only in-app navigation (or traversing back to such an entry) renders a modal.
   const [state, setState] = useState(() => ({ route: parseRoute(window.location.pathname), modal: false }))
+  const backGuardRef = useRef<(() => void) | null>(null)
+  // Shadow of the history entry `state` is currently rendering — a popstate has already applied by
+  // the time the event fires (there is no way to cancel it), so a blocked back-navigation is undone
+  // by pushing this remembered entry back on top rather than by trying to stop the browser.
+  const currentEntryRef = useRef<{ url: string; navState: unknown }>({
+    url: window.location.href,
+    navState: window.history.state,
+  })
 
   useEffect(() => {
-    const onPopState = () => setState(readLocation())
+    const onPopState = () => {
+      const guard = backGuardRef.current
+      if (guard) {
+        const entry = currentEntryRef.current
+        window.history.pushState(entry.navState, '', entry.url)
+        guard()
+        return
+      }
+      currentEntryRef.current = { url: window.location.href, navState: window.history.state }
+      setState(readLocation())
+    }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
@@ -103,10 +130,15 @@ export function useRoute(): RouteState {
   const navigate = useCallback((to: string, options?: { modal?: boolean }) => {
     const modal = options?.modal === true
     window.history.pushState({ modal }, '', withBase(to))
+    currentEntryRef.current = { url: window.location.href, navState: window.history.state }
     setState(readLocation())
   }, [])
 
   const back = useCallback(() => window.history.back(), [])
+  const setBackGuard = useCallback((handler: (() => void) | null) => {
+    backGuardRef.current = handler
+  }, [])
+  const isBackGuarded = useCallback(() => backGuardRef.current !== null, [])
 
-  return { ...state, navigate, back }
+  return { ...state, navigate, back, setBackGuard, isBackGuarded }
 }

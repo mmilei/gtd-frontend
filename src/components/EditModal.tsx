@@ -25,6 +25,9 @@ export interface EditProps {
   frame?: Frame
   /** App-level navigation for the vault-link chips. Omitted: the links fall back to a full page load. */
   onNavigate?: (to: string, options?: { modal?: boolean }) => void
+  /** Wired to useRoute's setBackGuard — lets a dirty modal intercept the browser back button and show
+   *  its own discard-confirmation instead of being unmounted by the route change underneath it. */
+  registerDirtyGuard?: (handler: (() => void) | null) => void
 }
 
 const cleanTag = (t: string) =>
@@ -103,7 +106,7 @@ function RelatedPeople({ people, onNavigate }: { people: string[]; onNavigate?: 
   return <VaultLinks label="Related people" links={links} onNavigate={onNavigate} />
 }
 
-export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved, frame = overlayFrame, onNavigate }: EditProps) {
+export function EditModal({ file, tagSuggestions, projectSuggestions, locationSuggestions, areaOptions, onClose, onSaved, frame = overlayFrame, onNavigate, registerDirtyGuard }: EditProps) {
   const isNew = file === null
 
   const [original, setOriginal] = useState<Item | null>(null)
@@ -217,6 +220,25 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
     if (dirty) setConfirmingDiscard(true)
     else onClose()
   }
+
+  // requestClose is redefined every render; a ref keeps the guard's closure fresh without having to
+  // re-register it (and re-run its cleanup) on every render.
+  const requestCloseRef = useRef(requestClose)
+  requestCloseRef.current = requestClose
+
+  useEffect(() => {
+    if (!registerDirtyGuard) return
+    registerDirtyGuard(dirty ? () => requestCloseRef.current() : null)
+    return () => registerDirtyGuard(null)
+  }, [dirty, registerDirtyGuard])
+
+  // The confirmation bar (Done-blocked / Discard changes) renders at the bottom of the scrollable
+  // form — if the user had scrolled up, it can pop in fully out of view with no visible feedback
+  // that anything happened at all (looked like Back/Escape/X just silently did nothing).
+  const footerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (confirmingDone || confirmingDiscard) footerRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [confirmingDone, confirmingDiscard])
 
   /** Throw away edits and restore the just-opened state — the modal stays open. */
   function resetFromOriginal() {
@@ -572,6 +594,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
 
         <RelatedPeople people={original?.related_people ?? []} onNavigate={onNavigate} />
 
+        <div ref={footerRef}>
         {confirmingDone && !isNew ? (
           // Warn, never forbid: "Close anyway" is always there and always closes.
           <div className="flex flex-col gap-2 rounded-card border border-waiting/40 bg-waiting/10 px-4 py-2.5">
@@ -646,6 +669,7 @@ export function EditModal({ file, tagSuggestions, projectSuggestions, locationSu
             </button>
           </div>
         )}
+        </div>
       </div>
     ),
   })
