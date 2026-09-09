@@ -112,3 +112,49 @@ describe('useRoute popstate', () => {
     expect(result.current.modal).toBe(false)
   })
 })
+
+// Regression: a dirty EditModal used to be silently unmounted by the browser back button, since the
+// popstate handler updated `route` (and App's own listener remounted it via `key`) before the modal
+// ever got a chance to show its own discard-confirmation. setBackGuard/isBackGuarded close that gap.
+describe('useRoute back guard', () => {
+  it('a registered guard absorbs the popstate: route stays put, the entry is restored, the guard runs', () => {
+    const pushState = vi.spyOn(window.history, 'pushState')
+    const { result } = renderHook(() => useRoute())
+
+    act(() => result.current.navigate('/backlog/x.md', { modal: true }))
+    pushState.mockClear()
+
+    const guard = vi.fn()
+    act(() => result.current.setBackGuard(guard))
+    expect(result.current.isBackGuarded()).toBe(true)
+
+    act(() => {
+      window.history.replaceState(null, '', '/') // browser already applied the back before popstate fires
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    })
+
+    expect(guard).toHaveBeenCalledTimes(1)
+    expect(pushState).toHaveBeenCalledTimes(1)
+    const [restoredState, , restoredUrl] = pushState.mock.calls[0]
+    expect(restoredState).toEqual({ modal: true })
+    expect(String(restoredUrl)).toMatch(/\/backlog\/x\.md$/)
+    expect(result.current.route).toEqual({ kind: 'item', file: 'x.md' })
+    expect(result.current.modal).toBe(true)
+  })
+
+  it('lets popstate through again once the guard is cleared', () => {
+    const { result } = renderHook(() => useRoute())
+
+    act(() => result.current.navigate('/backlog/x.md', { modal: true }))
+    act(() => result.current.setBackGuard(() => {}))
+    act(() => result.current.setBackGuard(null))
+    expect(result.current.isBackGuarded()).toBe(false)
+
+    act(() => {
+      window.history.replaceState(null, '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    })
+
+    expect(result.current.route).toEqual({ kind: 'list' })
+  })
+})
